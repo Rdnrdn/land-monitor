@@ -1,0 +1,296 @@
+import uuid
+
+from django.contrib import messages
+from django.core.exceptions import ObjectDoesNotExist
+from django.db import IntegrityError, transaction
+from django.db.models import Q
+from django.http import HttpRequest, HttpResponseRedirect
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views import View
+from django.views.generic import DetailView, ListView
+
+from .models import Lot, UserLot, UserLotStatus
+
+
+ALLOWED_ORDERINGS = {
+    "-updated_at": "-updated_at",
+    "price_min": "price_min",
+    "-price_min": "-price_min",
+    "application_deadline": "application_deadline",
+    "-application_deadline": "-application_deadline",
+    "score": "score",
+    "-score": "-score",
+}
+
+IN_PROGRESS_STATUSES = (
+    UserLotStatus.REVIEW,
+    UserLotStatus.PLAN,
+    UserLotStatus.APPLIED,
+    UserLotStatus.BIDDING,
+)
+
+TAB_OPTIONS = (
+    ("all", "Все"),
+    ("favorites", "Избранное"),
+    ("in_progress", "В работе"),
+    ("needs_check", "На проверку"),
+    ("archive", "Архив"),
+)
+
+STATUS_CHOICES = tuple(UserLotStatus.choices)
+VALID_USER_STATUSES = {choice for choice, _ in STATUS_CHOICES}
+
+
+def _clean_distinct_values(queryset, field_name: str) -> list[str]:
+    return list(
+        queryset.exclude(**{f"{field_name}__isnull": True})
+        .exclude(**{field_name: ""})
+        .order_by(field_name)
+        .values_list(field_name, flat=True)
+        .distinct()
+    )
+
+
+def _updated_querystring(request, **updates: str | None) -> str:
+    query = request.GET.copy()
+    for key, value in updates.items():
+        if value in (None, ""):
+            query.pop(key, None)
+        else:
+            query[key] = value
+    return query.urlencode()
+
+
+def _get_user_lot_state(lot: Lot) -> UserLot | None:
+    try:
+        return lot.user_lot
+    except ObjectDoesNotExist:
+        return None
+
+
+def _get_next_url(request: HttpRequest, lot: Lot) -> str:
+    next_url = request.POST.get("next")
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return reverse("lots:detail", args=[lot.pk])
+
+
+def _create_user_lot(lot: Lot) -> UserLot:
+    now = timezone.now()
+    return UserLot.objects.create(
+        id=uuid.uuid4(),
+        lot=lot,
+        user_status=UserLotStatus.NEW,
+        is_favorite=False,
+        needs_inspection=False,
+        needs_legal_check=False,
+        deposit_paid=False,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def _get_or_create_user_lot(lot: Lot) -> tuple[UserLot, bool]:
+    existing = _get_user_lot_state(lot)
+    if existing is not None:
+        return existing, False
+
+    try:
+        with transaction.atomic():
+            return _create_user_lot(lot), True
+    except IntegrityError:
+        return UserLot.objects.get(lot=lot), False
+
+
+class LotListView(ListView):
+    model = Lot
+    template_name = "lots/lot_list.html"
+    context_object_name = "lots"
+    paginate_by = 50
+
+    def get_queryset(self):
+        queryset = Lot.objects.select_related("user_lot")
+
+        price_min = self.request.GET.get("price_min")
+        if price_min:
+            queryset = queryset.filter(price_min__gte=price_min)
+
+        price_max = self.request.GET.get("price_max")
+        if price_max:
+            queryset = queryset.filter(price_min__lte=price_max)
+
+        status = self.request.GET.get("status")
+        if status:
+            queryset = queryset.filter(lot_status_external=status)
+
+        region = self.request.GET.get("region")
+        if region:
+            queryset = queryset.filter(region=region)
+
+        is_active = self.request.GET.get("is_active")
+        if is_active == "true":
+            queryset = queryset.filter(is_active=True)
+        elif is_active == "false":
+            queryset = queryset.filter(is_active=False)
+
+        tab = self.get_current_tab()
+        if tab == "favorites":
+            queryset = queryset.filter(user_lot__is_favorite=True)
+        elif tab == "in_progress":
+            queryset = queryset.filter(user_lot__user_status__in=IN_PROGRESS_STATUSES)
+        elif tab == "needs_check":
+            queryset = queryset.filter(
+                Q(user_lot__needs_inspection=True) | Q(user_lot__needs_legal_check=True)
+            )
+        elif tab == "archive":
+            queryset = queryset.filter(
+                Q(user_lot__user_status=UserLotStatus.ARCHIVE) | Q(is_active=False)
+            )
+
+        return queryset.order_by(self.get_ordering_value(), "-id")
+
+    def get_current_tab(self) -> str:
+        tab = self.request.GET.get("tab", "all")
+        return tab if tab in dict(TAB_OPTIONS) else "all"
+
+    def get_ordering_value(self) -> str:
+        ordering = self.request.GET.get("ordering", "-updated_at")
+        return ALLOWED_ORDERINGS.get(ordering, "-updated_at")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        for lot in context["lots"]:
+            lot.user_lot_state = _get_user_lot_state(lot)
+
+        base_queryset = Lot.objects.all()
+        current_tab = self.get_current_tab()
+        current_ordering = self.request.GET.get("ordering", "-updated_at")
+
+        context["tab_options"] = [
+            {
+                "value": value,
+                "label": label,
+                "is_active": value == current_tab,
+                "querystring": _updated_querystring(self.request, tab=value, page=None),
+            }
+            for value, label in TAB_OPTIONS
+        ]
+        context["ordering_options"] = [
+            ("-updated_at", "Сначала новые"),
+            ("price_min", "Цена: по возрастанию"),
+            ("-price_min", "Цена: по убыванию"),
+            ("application_deadline", "Дедлайн: ближе"),
+            ("-application_deadline", "Дедлайн: дальше"),
+            ("score", "Score: по возрастанию"),
+            ("-score", "Score: по убыванию"),
+        ]
+        context["current_tab"] = current_tab
+        context["current_ordering"] = (
+            current_ordering if current_ordering in ALLOWED_ORDERINGS else "-updated_at"
+        )
+        context["region_options"] = _clean_distinct_values(base_queryset, "region")
+        context["status_options"] = _clean_distinct_values(base_queryset, "lot_status_external")
+        context["page_querystring"] = _updated_querystring(self.request, page=None)
+        context["user_status_choices"] = STATUS_CHOICES
+        context["has_active_filters"] = any(
+            self.request.GET.get(param)
+            for param in ("price_min", "price_max", "status", "region", "is_active")
+        ) or current_tab != "all"
+        return context
+
+
+class LotDetailView(DetailView):
+    model = Lot
+    template_name = "lots/lot_detail.html"
+    context_object_name = "lot"
+    queryset = Lot.objects.select_related("user_lot")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["user_lot"] = _get_user_lot_state(self.object)
+        context["user_status_choices"] = STATUS_CHOICES
+        return context
+
+
+class LotQuickActionView(View):
+    def post(self, request: HttpRequest, pk: int) -> HttpResponseRedirect:
+        lot = get_object_or_404(Lot, pk=pk)
+        action = request.POST.get("action", "")
+
+        if action == "set_status":
+            return self._set_status(request, lot)
+        if action == "toggle_favorite":
+            return self._toggle_bool(
+                request,
+                lot,
+                field_name="is_favorite",
+                success_text="Избранное обновлено.",
+            )
+        if action == "toggle_needs_inspection":
+            return self._toggle_bool(
+                request,
+                lot,
+                field_name="needs_inspection",
+                success_text="Флаг осмотра обновлён.",
+            )
+        if action == "toggle_needs_legal_check":
+            return self._toggle_bool(
+                request,
+                lot,
+                field_name="needs_legal_check",
+                success_text="Флаг юр. проверки обновлён.",
+            )
+        if action == "toggle_deposit_paid":
+            return self._toggle_bool(
+                request,
+                lot,
+                field_name="deposit_paid",
+                success_text="Статус задатка обновлён.",
+            )
+
+        messages.error(request, "Неизвестное действие.")
+        return redirect(_get_next_url(request, lot))
+
+    def _set_status(self, request: HttpRequest, lot: Lot) -> HttpResponseRedirect:
+        user_status = request.POST.get("user_status", "")
+        if user_status not in VALID_USER_STATUSES:
+            messages.error(request, "Недопустимый статус.")
+            return redirect(_get_next_url(request, lot))
+
+        user_lot, created = _get_or_create_user_lot(lot)
+        user_lot.user_status = user_status
+        user_lot.updated_at = timezone.now()
+        user_lot.save(update_fields=["user_status", "updated_at"])
+
+        if created:
+            messages.success(request, "User state создан, статус обновлён.")
+        else:
+            messages.success(request, "Статус обновлён.")
+        return redirect(_get_next_url(request, lot))
+
+    def _toggle_bool(
+        self,
+        request: HttpRequest,
+        lot: Lot,
+        *,
+        field_name: str,
+        success_text: str,
+    ) -> HttpResponseRedirect:
+        user_lot, created = _get_or_create_user_lot(lot)
+        current_value = bool(getattr(user_lot, field_name))
+        setattr(user_lot, field_name, not current_value)
+        user_lot.updated_at = timezone.now()
+        user_lot.save(update_fields=[field_name, "updated_at"])
+
+        if created:
+            messages.success(request, "User state создан.")
+        else:
+            messages.info(request, success_text)
+        return redirect(_get_next_url(request, lot))

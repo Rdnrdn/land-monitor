@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title or "land-monitor" }}</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; color: #222; }
+        header { margin-bottom: 1.5rem; }
+        nav a { margin-right: 1rem; }
+        table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+        th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; vertical-align: top; }
+        form { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
+        label { display: flex; flex-direction: column; gap: 0.25rem; }
+        input, select { padding: 0.35rem; min-width: 10rem; }
+        .card { border: 1px solid #ccc; padding: 1rem; margin: 1rem 0; }
+        .muted { color: #666; }
+        .stack > * { margin: 0.35rem 0; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>{{ title or "land-monitor" }}</h1>
+        <nav>
+            <a href="/web/auctions">Auctions</a>
+            <a href="/web/auctions/cheapest">Cheapest</a>
+            <a href="/web/parser-runs">Parser Runs</a>
+        </nav>
+    </header>
+    {% block content %}{% endblock %}
+</body>
+</html>

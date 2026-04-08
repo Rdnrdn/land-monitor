@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>{{ heading }}</h2>
+
+<form method="get">
+    <label>
+        Region
+        <input type="text" name="region" value="{{ filters.region }}">
+    </label>
+    {% if view_name == "all" %}
+    <label>
+        Status
+        <input type="text" name="status" value="{{ filters.status }}">
+    </label>
+    <label>
+        Order By
+        <input type="text" name="order_by" value="{{ filters.order_by }}">
+    </label>
+    {% endif %}
+    <label>
+        Limit
+        <input type="number" name="limit" value="{{ filters.limit }}" min="1">
+    </label>
+    <label style="justify-content: end;">
+        <span>&nbsp;</span>
+        <button type="submit">Apply</button>
+    </label>
+</form>
+
+<p class="muted">Available regions: {{ regions|join(", ") if regions else "none" }}</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>External ID</th>
+            <th>Region</th>
+            <th>Start Price</th>
+            <th>Price Per Sotka</th>
+            <th>Status</th>
+            <th>Source URL</th>
+            <th>View</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in auctions %}
+        <tr>
+            <td>{{ item.id }}</td>
+            <td>{{ item.external_id }}</td>
+            <td>{{ item.region }}</td>
+            <td>{{ item.start_price }}</td>
+            <td>{{ item.price_per_sotka }}</td>
+            <td>{{ item.status }}</td>
+            <td><a href="{{ item.source_url }}" target="_blank" rel="noopener noreferrer">{{ item.source_url }}</a></td>
+            <td><a href="/web/auctions/{{ item.id }}/view">open</a></td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="8">No auctions found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

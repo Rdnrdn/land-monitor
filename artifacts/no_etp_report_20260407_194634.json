@@ -1,0 +1,250 @@
+{
+  "summary": {
+    "total_lots_without_etp": 6,
+    "notices_downloaded": 0,
+    "known_etp_count": 0,
+    "external_gov_site_count": 0,
+    "external_commercial_site_count": 0,
+    "torgi_portal_reference_count": 0,
+    "offline_count": 0,
+    "unknown_count": 6,
+    "top_domains": [],
+    "top_keywords": [],
+    "counts": {
+      "UNKNOWN": 6
+    },
+    "search_pages_checked": 3,
+    "search_total_seen": 30,
+    "search_empty_etp_found": 6,
+    "search_errors": [
+      {
+        "page": "3",
+        "error": "http_503"
+      },
+      {
+        "page": "4",
+        "error": "http_503"
+      }
+    ],
+    "search_errors_count": 2,
+    "search_had_empty_payload": false,
+    "unknown_notice_not_loaded_count": 2,
+    "unknown_notice_empty_count": 4,
+    "unknown_no_signals_count": 0,
+    "unknown_parse_weak_count": 0
+  },
+  "rows": [
+    {
+      "source_lot_id": "21000006870000000477_1",
+      "noticeNumber": "21000006870000000477",
+      "title": "Земельный участок площадью 367087 кв.м, кадастровый номер 50:03:0070280:4630, категория  земель – земли сельскохозяйственного назначения, вид разрешенного использования – растениеводство, скотоводство, расположенный по адресу: Московская область, г.о. Клин",
+      "region": null,
+      "etp_code_original": null,
+      "detected_platform_code": null,
+      "detected_site_type": "UNKNOWN",
+      "detected_domain": null,
+      "detection_method": "unknown",
+      "matched_value": null,
+      "matched_field_path": null,
+      "matched_text_fragment": null,
+      "confidence": "low",
+      "notice_url": "https://torgi.gov.ru/new/api/public/notices/noticeNumber/21000006870000000477",
+      "comment": null
+    },
+    {
+      "source_lot_id": "21000005710000001078_1",
+      "noticeNumber": "21000005710000001078",
+      "title": "земельный участок, местоположение: Российская Федерация, Московская область, Рузский муниципальный округ, д.Шелковка, площадь 1649 кв.м, разрешенное использование: для ведения личного подсобного хозяйства (приусадебный земельный участок)",
+      "region": null,
+      "etp_code_original": null,
+      "detected_platform_code": null,
+      "detected_site_type": "UNKNOWN",
+      "detected_domain": null,
+      "detection_method": "unknown",
+      "matched_value": null,
+      "matched_field_path": null,
+      "matched_text_fragment": null,
+      "confidence": "low",
+      "notice_url": "https://torgi.gov.ru/new/api/public/notices/noticeNumber/21000005710000001078",
+      "comment": null
+    },
+    {
+      "source_lot_id": "21000006870000000477_1",
+      "noticeNumber": "21000006870000000477",
+      "title": "Земельный участок площадью 367087 кв.м, кадастровый номер 50:03:0070280:4630, категория  земель – земли сельскохозяйственного назначения, вид разрешенного использования – растениеводство, скотоводство, расположенный по адресу: Московская область, г.о. Клин",
+      "region": null,
+      "etp_code_original": null,
+      "detected_platform_code": null,
+      "detected_site_type": "UNKNOWN",
+      "detected_domain": null,
+      "detection_method": "unknown",
+      "matched_value": null,
+      "matched_field_path": null,
+      "matched_text_fragment": null,
+      "confidence": "low",
+      "notice_url": "https://torgi.gov.ru/new/api/public/notices/noticeNumber/21000006870000000477",
+      "comment": null
+    },
+    {
+      "source_lot_id": "21000005710000001078_1",
+      "noticeNumber": "21000005710000001078",
+      "title": "земельный участок, местоположение: Российская Федерация, Московская область, Рузский муниципальный округ, д.Шелковка, площадь 1649 кв.м, разрешенное использование: для ведения личного подсобного хозяйства (приусадебный земельный участок)",
+      "region": null,
+      "etp_code_original": null,
+      "detected_platform_code": null,
+      "detected_site_type": "UNKNOWN",
+      "detected_domain": null,
+      "detection_method": "unknown",
+      "matched_value": null,
+      "matched_field_path": null,
+      "matched_text_fragment": null,
+      "confidence": "low",
+      "notice_url": "https://torgi.gov.ru/new/api/public/notices/noticeNumber/21000005710000001078",
+      "comment": null
+    },
+    {
+      "source_lot_id": "21000006870000000477_1",
+      "noticeNumber": "21000006870000000477",
+      "title": "Земельный участок площадью 367087 кв.м, кадастровый номер 50:03:0070280:4630, категория  земель – земли сельскохозяйственного назначения, вид разрешенного использования – растениеводство, скотоводство, расположенный по адресу: Московская область, г.о. Клин",
+      "region": null,
+      "etp_code_original": null,
+      "detected_platform_code": null,
+      "detected_site_type": "UNKNOWN",
+      "detected_domain": null,
+      "detection_method": "unknown",
+      "matched_value": null,
+      "matched_field_path": null,
+      "matched_text_fragment": null,
+      "confidence": "low",
+      "notice_url": "https://torgi.gov.ru/new/api/public/notices/noticeNumber/21000006870000000477",
+      "comment": null
+    },
+    {
+      "source_lot_id": "21000005710000001078_1",
+      "noticeNumber": "21000005710000001078",
+      "title": "земельный участок, местоположение: Российская Федерация, Московская область, Рузский муниципальный округ, д.Шелковка, площадь 1649 кв.м, разрешенное использование: для ведения личного подсобного хозяйства (приусадебный земельный участок)",
+      "region": null,
+      "etp_code_original": null,
+      "detected_platform_code": null,
+      "detected_site_type": "UNKNOWN",
+      "detected_domain": null,
+      "detection_method": "unknown",
+      "matched_value": null,
+      "matched_field_path": null,
+      "matched_text_fragment": null,
+      "confidence": "low",
+      "notice_url": "https://torgi.gov.ru/new/api/public/notices/noticeNumber/21000005710000001078",
+      "comment": null
+    }
+  ],
+  "unknown_diagnostics": [
+    {
+      "source_lot_id": "21000006870000000477_1",
+      "noticeNumber": "21000006870000000477",
+      "notice_fetch_status": "NOTICE_FETCH_HTTP_503",
+      "notice_loaded": false,
+      "notice_keys": [],
+      "string_fields_count": 0,
+      "has_urls": false,
+      "keyword_hits": {
+        "электронн": false,
+        "площадк": false,
+        "сайт": false,
+        "аукцион": false,
+        "торги": false,
+        "бумажн": false
+      },
+      "unknown_subcategory": "UNKNOWN_NOTICE_NOT_LOADED"
+    },
+    {
+      "source_lot_id": "21000005710000001078_1",
+      "noticeNumber": "21000005710000001078",
+      "notice_fetch_status": "NOTICE_FETCH_HTTP_503",
+      "notice_loaded": false,
+      "notice_keys": [],
+      "string_fields_count": 0,
+      "has_urls": false,
+      "keyword_hits": {
+        "электронн": false,
+        "площадк": false,
+        "сайт": false,
+        "аукцион": false,
+        "торги": false,
+        "бумажн": false
+      },
+      "unknown_subcategory": "UNKNOWN_NOTICE_NOT_LOADED"
+    },
+    {
+      "source_lot_id": "21000006870000000477_1",
+      "noticeNumber": "21000006870000000477",
+      "notice_fetch_status": "NOTICE_FETCH_EMPTY_JSON",
+      "notice_loaded": false,
+      "notice_keys": [],
+      "string_fields_count": 0,
+      "has_urls": false,
+      "keyword_hits": {
+        "электронн": false,
+        "площадк": false,
+        "сайт": false,
+        "аукцион": false,
+        "торги": false,
+        "бумажн": false
+      },
+      "unknown_subcategory": "UNKNOWN_NOTICE_EMPTY"
+    },
+    {
+      "source_lot_id": "21000005710000001078_1",
+      "noticeNumber": "21000005710000001078",
+      "notice_fetch_status": "NOTICE_FETCH_EMPTY_JSON",
+      "notice_loaded": false,
+      "notice_keys": [],
+      "string_fields_count": 0,
+      "has_urls": false,
+      "keyword_hits": {
+        "электронн": false,
+        "площадк": false,
+        "сайт": false,
+        "аукцион": false,
+        "торги": false,
+        "бумажн": false
+      },
+      "unknown_subcategory": "UNKNOWN_NOTICE_EMPTY"
+    },
+    {
+      "source_lot_id": "21000006870000000477_1",
+      "noticeNumber": "21000006870000000477",
+      "notice_fetch_status": "NOTICE_FETCH_EMPTY_JSON",
+      "notice_loaded": false,
+      "notice_keys": [],
+      "string_fields_count": 0,
+      "has_urls": false,
+      "keyword_hits": {
+        "электронн": false,
+        "площадк": false,
+        "сайт": false,
+        "аукцион": false,
+        "торги": false,
+        "бумажн": false
+      },
+      "unknown_subcategory": "UNKNOWN_NOTICE_EMPTY"
+    },
+    {
+      "source_lot_id": "21000005710000001078_1",
+      "noticeNumber": "21000005710000001078",
+      "notice_fetch_status": "NOTICE_FETCH_EMPTY_JSON",
+      "notice_loaded": false,
+      "notice_keys": [],
+      "string_fields_count": 0,
+      "has_urls": false,
+      "keyword_hits": {
+        "электронн": false,
+        "площадк": false,
+        "сайт": false,
+        "аукцион": false,
+        "торги": false,
+        "бумажн": false
+      },
+      "unknown_subcategory": "UNKNOWN_NOTICE_EMPTY"
+    }
+  ]
+}

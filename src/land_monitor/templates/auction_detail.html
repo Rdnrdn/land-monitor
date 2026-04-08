@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+<p><a href="/web/auctions">Back to auctions</a></p>
+
+<div class="card stack">
+    <h2>Auction</h2>
+    <div><strong>ID:</strong> {{ card.auction.id }}</div>
+    <div><strong>External ID:</strong> {{ card.auction.external_id }}</div>
+    <div><strong>Region:</strong> {{ card.auction.region }}</div>
+    <div><strong>Start Price:</strong> {{ card.auction.start_price }}</div>
+    <div><strong>Price Per Sotka:</strong> {{ card.auction.price_per_sotka }}</div>
+    <div><strong>Status:</strong> {{ card.auction.status }}</div>
+    <div><strong>Created At:</strong> {{ card.auction.created_at }}</div>
+    <div><strong>Source URL:</strong> <a href="{{ card.auction.source_url }}" target="_blank" rel="noopener noreferrer">{{ card.auction.source_url }}</a></div>
+</div>
+
+<div class="card stack">
+    <h2>Plot</h2>
+    {% if card.plot %}
+    <div><strong>Cadastre Number:</strong> {{ card.plot.cadastre_number }}</div>
+    <div><strong>Title:</strong> {{ card.plot.title }}</div>
+    <div><strong>Address:</strong> {{ card.plot.address }}</div>
+    <div><strong>Area:</strong> {{ card.plot.area }}</div>
+    <div><strong>Area Sotka:</strong> {{ card.plot.area_sotka }}</div>
+    <div><strong>Region:</strong> {{ card.plot.region }}</div>
+    {% else %}
+    <div>No plot data.</div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Price History</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Price</th>
+                <th>Recorded At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in card.price_history %}
+            <tr>
+                <td>{{ item.price }}</td>
+                <td>{{ item.recorded_at }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="2">No price history.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

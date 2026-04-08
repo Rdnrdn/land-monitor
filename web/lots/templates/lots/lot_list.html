@@ -1,0 +1,195 @@
+{% extends "lots/base.html" %}
+
+{% block title %}Лоты | Land Monitor{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel__body">
+        <div class="tabs">
+            {% for tab in tab_options %}
+                <a class="tab{% if tab.is_active %} is-active{% endif %}" href="?{{ tab.querystring }}">{{ tab.label }}</a>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel__body">
+        <form method="get" class="grid" action="">
+            <input type="hidden" name="tab" value="{{ current_tab }}">
+            <div class="filters">
+                <div class="field">
+                    <label for="id_price_min">Цена от</label>
+                    <input id="id_price_min" type="number" step="0.01" name="price_min" value="{{ request.GET.price_min }}">
+                </div>
+                <div class="field">
+                    <label for="id_price_max">Цена до</label>
+                    <input id="id_price_max" type="number" step="0.01" name="price_max" value="{{ request.GET.price_max }}">
+                </div>
+                <div class="field">
+                    <label for="id_status">Статус лота</label>
+                    <select id="id_status" name="status">
+                        <option value="">Любой</option>
+                        {% for value in status_options %}
+                            <option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="id_region">Регион</label>
+                    <select id="id_region" name="region">
+                        <option value="">Любой</option>
+                        {% for value in region_options %}
+                            <option value="{{ value }}" {% if request.GET.region == value %}selected{% endif %}>{{ value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="id_is_active">Активность</label>
+                    <select id="id_is_active" name="is_active">
+                        <option value="">Любая</option>
+                        <option value="true" {% if request.GET.is_active == "true" %}selected{% endif %}>Только активные</option>
+                        <option value="false" {% if request.GET.is_active == "false" %}selected{% endif %}>Только неактивные</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="id_ordering">Сортировка</label>
+                    <select id="id_ordering" name="ordering">
+                        {% for value, label in ordering_options %}
+                            <option value="{{ value }}" {% if current_ordering == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="actions">
+                <button type="submit">Применить</button>
+                <a class="button button--ghost" href="?tab={{ current_tab }}">Сбросить фильтры</a>
+            </div>
+        </form>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel__body">
+        <div class="actions" style="justify-content: space-between; margin-bottom: 14px;">
+            <span class="muted">
+                Найдено: {{ page_obj.paginator.count }}
+                {% if has_active_filters %}<span class="badge">с фильтрами</span>{% endif %}
+            </span>
+        </div>
+
+        {% if lots %}
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Region</th>
+                            <th>Cadastre</th>
+                            <th>Price</th>
+                            <th>Deadline</th>
+                            <th>Lot status</th>
+                            <th>Score</th>
+                            <th>User status</th>
+                            <th>Favorite</th>
+                            <th>Inspect</th>
+                            <th>Legal</th>
+                            <th>Deposit</th>
+                            <th>Open</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lot in lots %}
+                            <tr>
+                                <td data-label="ID">{{ lot.id }}</td>
+                                <td data-label="Title">{{ lot.title|default:"—" }}</td>
+                                <td data-label="Region">{{ lot.region|default:"—" }}</td>
+                                <td data-label="Cadastre">{{ lot.cadastre_number|default:"—" }}</td>
+                                <td data-label="Price">{{ lot.price_min|default:"—" }}</td>
+                                <td data-label="Deadline">{{ lot.application_deadline|date:"d.m.Y H:i"|default:"—" }}</td>
+                                <td data-label="Lot status">{{ lot.lot_status_external|default:"—" }}</td>
+                                <td data-label="Score">{{ lot.score|default:"—" }}</td>
+                                <td data-label="User status">
+                                    {% if lot.user_lot_state %}{{ lot.user_lot_state.user_status }}{% else %}—{% endif %}
+                                </td>
+                                <td data-label="Favorite">
+                                    {% if lot.user_lot_state %}{% if lot.user_lot_state.is_favorite %}Да{% else %}Нет{% endif %}{% else %}—{% endif %}
+                                </td>
+                                <td data-label="Inspect">
+                                    {% if lot.user_lot_state %}{% if lot.user_lot_state.needs_inspection %}Да{% else %}Нет{% endif %}{% else %}—{% endif %}
+                                </td>
+                                <td data-label="Legal">
+                                    {% if lot.user_lot_state %}{% if lot.user_lot_state.needs_legal_check %}Да{% else %}Нет{% endif %}{% else %}—{% endif %}
+                                </td>
+                                <td data-label="Deposit">
+                                    {% if lot.user_lot_state %}{% if lot.user_lot_state.deposit_paid %}Оплачен{% else %}Нет{% endif %}{% else %}—{% endif %}
+                                </td>
+                                <td data-label="Open"><a href="{% url 'lots:detail' lot.pk %}">Открыть</a></td>
+                                <td data-label="Действия" class="actions-cell">
+                                    <div class="inline-actions">
+                                        <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="toggle_favorite">
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit">
+                                                {% if lot.user_lot_state and lot.user_lot_state.is_favorite %}Убрать из избранного{% else %}В избранное{% endif %}
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="toggle_needs_inspection">
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit">Осмотр</button>
+                                        </form>
+                                        <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="toggle_needs_legal_check">
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit">Юр. проверка</button>
+                                        </form>
+                                        <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="toggle_deposit_paid">
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit">Задаток</button>
+                                        </form>
+                                        <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="set_status">
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <select name="user_status">
+                                                {% for value, label in user_status_choices %}
+                                                    <option value="{{ value }}" {% if lot.user_lot_state and lot.user_lot_state.user_status == value %}selected{% endif %}>
+                                                        {{ label }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                            <button type="submit">Статус</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" style="margin-top: 18px;">
+                <span class="muted">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                <div class="actions">
+                    {% if page_obj.has_previous %}
+                        <a class="button button--ghost" href="?{{ page_querystring }}&page={{ page_obj.previous_page_number }}">Назад</a>
+                    {% endif %}
+                    {% if page_obj.has_next %}
+                        <a class="button button--ghost" href="?{{ page_querystring }}&page={{ page_obj.next_page_number }}">Дальше</a>
+                    {% endif %}
+                </div>
+            </div>
+        {% else %}
+            <div class="empty">Лоты по текущим условиям не найдены.</div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

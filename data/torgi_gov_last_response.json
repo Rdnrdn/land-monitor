@@ -1,0 +1,1093 @@
+{
+  "content": [
+    {
+      "id": "22000042300000000110_1",
+      "noticeNumber": "22000042300000000110",
+      "lotNumber": 1,
+      "lotStatus": "PUBLISHED",
+      "biddType": {
+        "code": "1041PP",
+        "name": "Реализация имущества, обращенного в собственность государства, и иного изъятого имущества"
+      },
+      "biddForm": {
+        "code": "EA",
+        "name": "Электронный аукцион"
+      },
+      "lotName": "Лодка «Подъездок» - 1 шт. Лодка Казанка с двигателем марки Tarpon, мощность 5 л.с., без заводского номера – 1 шт. Лодка алюминиевая кустарного производства – 1 шт. Лодка резиновая двухместная зеленого цвета – 1 шт. Лодка резиновая «Pelican-268», зеленого цвета, без весел – 1 шт. Моторно – гребная резиновая лодка ПВХ – 1 шт. Подвесной лодочный мотор «Sea Pro» мотор Т3S – 1 шт. Маломерное судно типа «Подъездок» - 1 шт. Лодка резиновая серого цвета фирмы «BERING-340» - 1 шт.",
+      "lotDescription": "Лодка «Подъездок» - 1 шт. Лодка Казанка с двигателем марки Tarpon, мощность 5 л.с., без заводского номера – 1 шт. Лодка алюминиевая кустарного производства – 1 шт. Лодка резиновая двухместная зеленого цвета – 1 шт. Лодка резиновая «Pelican-268», зеленого цвета, без весел – 1 шт. Моторно – гребная резиновая лодка ПВХ – 1 шт. Подвесной лодочный мотор «Sea Pro» мотор Т3S – 1 шт. Маломерное судно типа «Подъездок» - 1 шт. Лодка резиновая серого цвета фирмы «BERING-340» - 1 шт.",
+      "priceMin": 18529.7,
+      "priceMinExact": "18529.70",
+      "biddEndTime": "2026-05-03T06:00:00.000+00:00",
+      "lotImages": [
+        "69d0f485a514f81d3c3a21e9",
+        "69d0f48597c90149f6ef83de",
+        "69d0f485ea72e414d549e535",
+        "69d0f4856df3621c36107440",
+        "69d0f485ea72e414d549e539",
+        "69d0f4856df3621c36107444"
+      ],
+      "lotVideos": [],
+      "characteristics": [
+        {
+          "characteristicValue": "Лодка",
+          "name": "Вид водного транспорта",
+          "code": "waterTransportType",
+          "type": "Text(100)"
+        },
+        {
+          "name": "Пробег",
+          "code": "mileage",
+          "unit": {
+            "code": "008",
+            "name": "Километр; тысяча метров",
+            "symbol": "км"
+          },
+          "type": "Int"
+        },
+        {
+          "characteristicValue": "-",
+          "name": "Регистрационный номер",
+          "code": "waterTransportRegNumber",
+          "type": "Text(100)"
+        },
+        {
+          "name": "Назначение",
+          "code": "waterTransportPurpose",
+          "type": "Text(500)"
+        },
+        {
+          "characteristicValue": "-",
+          "name": "Модель",
+          "code": "waterTransportModel",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": "-",
+          "name": "Год выпуска",
+          "code": "yearProduction",
+          "type": "Text(20)"
+        },
+        {
+          "name": "Состояние",
+          "code": "waterTransportCondition",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": "-",
+          "name": "VIN (заводской) номер",
+          "code": "vinFactory",
+          "type": "Text(100)"
+        },
+        {
+          "name": "Дата регистрации ",
+          "code": "waterTransportDateReg",
+          "type": "Date"
+        },
+        {
+          "name": "Марка",
+          "code": "waterTransportMarka",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": {
+            "code": "pryamie",
+            "name": "Прямое",
+            "actual": false
+          },
+          "name": "Назначение",
+          "code": "generalPurpose",
+          "type": "Select"
+        }
+      ],
+      "currencyCode": "643",
+      "etpCode": "ETP_SBAST",
+      "subjectRFCode": "23",
+      "category": {
+        "code": "16",
+        "name": "Водный транспорт"
+      },
+      "createDate": "2026-04-04T11:27:23.353+00:00",
+      "timeZoneName": "МСК",
+      "timezoneOffset": "180",
+      "hasAppeals": false,
+      "isStopped": false,
+      "attributes": [
+        {
+          "code": "Lot.DA_typeProperty_EA1041",
+          "fullName": "Вид имущества",
+          "value": {
+            "code": "DA_typeProperty_EA1041_Select_1",
+            "name": "Имущество, обращенное в федеральную собственность"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 551
+        },
+        {
+          "code": "Lot.DA_acquaintanceProperty_EA1041",
+          "fullName": "Сроки и время ознакомления покупателя с имуществом",
+          "value": "Осмотр имущества осуществляется в рабочие дни с 10:00 ч. до 17:00 ч. (время московское) по предварительному согласованию с лицом, ответственным за обеспечение доступа к осмотру имущества, не менее чем за три рабочих дня до предполагаемой даты осмотра, путем направления заявки на осмотр по форме указанной в информационном извещении на электронный адрес info@spektr-ug.ru\nЛицо, ответственное за обеспечение доступа к осмотру имущества: Рыжак Игорь Владимирович, тел: 89184341058.\nОсмотр имущества осуществляется без взимания платы.\n",
+          "attributeType": "Text(1000)",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 553
+        },
+        {
+          "code": "Lot.DA_concludingContract_EA1041",
+          "fullName": "Срок заключения договора купли-продажи",
+          "value": "По результатам проведенного аукциона в электронной форме Организатор аукциона (продавец) и победитель аукциона (покупатель) не ранее 10 рабочих дней и не позднее 15 рабочих дней со дня подведения итогов аукциона заключают договор купли-продажи имущества в электронной форме.",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 554
+        },
+        {
+          "code": "DA_contractType_EA1041",
+          "fullName": "Вид договора",
+          "value": {
+            "code": "1",
+            "name": "Договор купли-продажи"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 554
+        },
+        {
+          "code": "Lot.DA_depositRules_EA1041",
+          "fullName": "Порядок внесения задатка",
+          "value": "Задаток за участие в аукционе должен поступить на специальный счет, открытый потенциальным покупателем в одном из банков, перечень которых устанавливается Правительством Российской Федерации о контрактной системе закупок товаров, работ, услуг для обеспечения государственных и муниципальных нужд. \n Задаток должен поступить не позднее даты окончания приема заявок.\n",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 492
+        },
+        {
+          "code": "Lot.DA_retender_EA1041",
+          "fullName": "Информационное сообщение является повторным в соответствии с п.18 ПП РФ 1041",
+          "value": true,
+          "attributeType": "Checker",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 493
+        },
+        {
+          "code": "Lot.DA_discountSize_EA1041",
+          "fullName": "Размер снижения начальной цены",
+          "value": {
+            "code": "DA_discountSize_EA1041_Select_1",
+            "name": "30%"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 494
+        },
+        {
+          "code": "Lot.DA_discountRule_EA1041",
+          "fullName": "Периодичность снижения начальной цены",
+          "value": "10 рабочих дней",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 495
+        }
+      ],
+      "isAnnulled": false,
+      "noticeFirstVersionPublicationDate": "2026-04-04T11:29:07.009Z",
+      "lotVat": {
+        "code": "includedVAT",
+        "name": "С учетом НДС"
+      },
+      "npaHintCode": "hint1_1041PP_38PP",
+      "typeTransaction": "sale"
+    },
+    {
+      "id": "22000042300000000109_1",
+      "noticeNumber": "22000042300000000109",
+      "lotNumber": 1,
+      "lotStatus": "PUBLISHED",
+      "biddType": {
+        "code": "1041PP",
+        "name": "Реализация имущества, обращенного в собственность государства, и иного изъятого имущества"
+      },
+      "biddForm": {
+        "code": "EA",
+        "name": "Электронный аукцион"
+      },
+      "lotName": "Автомобиль Лада Калина 11930, г/н М134УВ123. Документы и ключи отсутствуют.",
+      "lotDescription": "Автомобиль Лада Калина 11930, г/н М134УВ123. Документы и ключи отсутствуют.",
+      "priceMin": 92810.66,
+      "priceMinExact": "92810.66",
+      "biddEndTime": "2026-05-03T06:00:00.000+00:00",
+      "lotImages": [
+        "69d0f14f6df3621c361072f5",
+        "69d0f16997c90149f6ef823f",
+        "69d0f178ea72e414d549e4e2"
+      ],
+      "lotVideos": [],
+      "characteristics": [
+        {
+          "name": "Пробег",
+          "code": "mileage",
+          "unit": {
+            "code": "008",
+            "name": "Километр; тысяча метров",
+            "symbol": "км"
+          },
+          "type": "Int"
+        },
+        {
+          "characteristicValue": "легковой автомобиль",
+          "name": "Вид транспорта",
+          "code": "typeCar",
+          "type": "Text(100)"
+        },
+        {
+          "name": "Объем двигателя",
+          "code": "engineCapacity",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": "-",
+          "name": "Год выпуска",
+          "code": "yearProduction",
+          "type": "Text(20)"
+        },
+        {
+          "name": "Коробка передач",
+          "code": "transmission",
+          "type": "Text(100)"
+        },
+        {
+          "name": "Привод",
+          "code": "drive",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": "М134УВ123",
+          "name": "Государственный регистрационный знак",
+          "code": "regNumber",
+          "type": "Text(20)"
+        },
+        {
+          "name": "Мощность двигателя",
+          "code": "enginePower",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": "-",
+          "name": "VIN номер",
+          "code": "vin",
+          "type": "Text(100)"
+        },
+        {
+          "name": "Экологический класс",
+          "code": "environmentalClass",
+          "type": "Text(100)"
+        },
+        {
+          "name": "Дата государственного регистрационного знака",
+          "code": "dateRegNumber",
+          "type": "Date"
+        },
+        {
+          "characteristicValue": "Лада ",
+          "name": "Марка",
+          "code": "carMarka",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": "Лада Калина 11930",
+          "name": "Модель",
+          "code": "carModel",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": {
+            "code": "pryamie",
+            "name": "Прямое",
+            "actual": false
+          },
+          "name": "Назначение",
+          "code": "generalPurpose",
+          "type": "Select"
+        }
+      ],
+      "currencyCode": "643",
+      "etpCode": "ETP_SBAST",
+      "subjectRFCode": "23",
+      "category": {
+        "code": "100001",
+        "name": "Легковые автомобили"
+      },
+      "createDate": "2026-04-04T11:12:45.480+00:00",
+      "timeZoneName": "МСК",
+      "timezoneOffset": "180",
+      "hasAppeals": false,
+      "isStopped": false,
+      "attributes": [
+        {
+          "code": "Lot.DA_typeProperty_EA1041",
+          "fullName": "Вид имущества",
+          "value": {
+            "code": "DA_typeProperty_EA1041_Select_1",
+            "name": "Имущество, обращенное в федеральную собственность"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 551
+        },
+        {
+          "code": "Lot.DA_acquaintanceProperty_EA1041",
+          "fullName": "Сроки и время ознакомления покупателя с имуществом",
+          "value": "Осмотр имущества осуществляется в рабочие дни с 10:00 ч. до 17:00 ч. (время московское) по предварительному согласованию с лицом, ответственным за обеспечение доступа к осмотру имущества, не менее чем за три рабочих дня до предполагаемой даты осмотра, путем направления заявки на осмотр по форме указанной в информационном извещении на электронный адрес info@spektr-ug.ru\nЛицо, ответственное за обеспечение доступа к осмотру имущества: Рыжак Игорь Владимирович, тел: 89184341058.\nОсмотр имущества осуществляется без взимания платы.\n",
+          "attributeType": "Text(1000)",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 553
+        },
+        {
+          "code": "Lot.DA_concludingContract_EA1041",
+          "fullName": "Срок заключения договора купли-продажи",
+          "value": "По результатам проведенного аукциона в электронной форме Организатор аукциона (продавец) и победитель аукциона (покупатель) не ранее 10 рабочих дней и не позднее 15 рабочих дней со дня подведения итогов аукциона заключают договор купли-продажи имущества в электронной форме.",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 554
+        },
+        {
+          "code": "DA_contractType_EA1041",
+          "fullName": "Вид договора",
+          "value": {
+            "code": "1",
+            "name": "Договор купли-продажи"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 554
+        },
+        {
+          "code": "Lot.DA_depositRules_EA1041",
+          "fullName": "Порядок внесения задатка",
+          "value": "Задаток за участие в аукционе должен поступить на специальный счет, открытый потенциальным покупателем в одном из банков, перечень которых устанавливается Правительством Российской Федерации о контрактной системе закупок товаров, работ, услуг для обеспечения государственных и муниципальных нужд. \n Задаток должен поступить не позднее даты окончания приема заявок.\n",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 492
+        },
+        {
+          "code": "Lot.DA_retender_EA1041",
+          "fullName": "Информационное сообщение является повторным в соответствии с п.18 ПП РФ 1041",
+          "value": true,
+          "attributeType": "Checker",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 493
+        },
+        {
+          "code": "Lot.DA_discountSize_EA1041",
+          "fullName": "Размер снижения начальной цены",
+          "value": {
+            "code": "DA_discountSize_EA1041_Select_1",
+            "name": "30%"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 494
+        },
+        {
+          "code": "Lot.DA_discountRule_EA1041",
+          "fullName": "Периодичность снижения начальной цены",
+          "value": "10 рабочих дней",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 495
+        }
+      ],
+      "isAnnulled": false,
+      "noticeFirstVersionPublicationDate": "2026-04-04T11:13:25.458Z",
+      "lotVat": {
+        "code": "includedVAT",
+        "name": "С учетом НДС"
+      },
+      "npaHintCode": "hint1_1041PP_38PP",
+      "typeTransaction": "sale"
+    },
+    {
+      "id": "22000042300000000108_1",
+      "noticeNumber": "22000042300000000108",
+      "lotNumber": 1,
+      "lotStatus": "PUBLISHED",
+      "biddType": {
+        "code": "1041PP",
+        "name": "Реализация имущества, обращенного в собственность государства, и иного изъятого имущества"
+      },
+      "biddForm": {
+        "code": "EA",
+        "name": "Электронный аукцион"
+      },
+      "lotName": "Автомобиль ВАЗ-21102, г/н М110ЕУ93, г.в 2003, цвет светло – серый, VIN (XTA21102030628548) Документы и ключи отсутствуют.",
+      "lotDescription": "Автомобиль ВАЗ-21102, г/н М110ЕУ93, г.в 2003, цвет светло – серый, VIN (XTA21102030628548) Документы и ключи отсутствуют.",
+      "priceMin": 36838.2,
+      "priceMinExact": "36838.20",
+      "biddEndTime": "2026-05-03T06:00:00.000+00:00",
+      "lotImages": [
+        "69d0ee1aa514f81d3c3a20ff",
+        "69d0ee1a6df3621c36107292",
+        "69d0ee1b6df3621c36107295"
+      ],
+      "lotVideos": [],
+      "characteristics": [
+        {
+          "name": "Пробег",
+          "code": "mileage",
+          "unit": {
+            "code": "008",
+            "name": "Километр; тысяча метров",
+            "symbol": "км"
+          },
+          "type": "Int"
+        },
+        {
+          "characteristicValue": "легковой автомобиль",
+          "name": "Вид транспорта",
+          "code": "typeCar",
+          "type": "Text(100)"
+        },
+        {
+          "name": "Объем двигателя",
+          "code": "engineCapacity",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": "2003",
+          "name": "Год выпуска",
+          "code": "yearProduction",
+          "type": "Text(20)"
+        },
+        {
+          "name": "Коробка передач",
+          "code": "transmission",
+          "type": "Text(100)"
+        },
+        {
+          "name": "Привод",
+          "code": "drive",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": "М110ЕУ93",
+          "name": "Государственный регистрационный знак",
+          "code": "regNumber",
+          "type": "Text(20)"
+        },
+        {
+          "name": "Мощность двигателя",
+          "code": "enginePower",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": "XTA21102030628548",
+          "name": "VIN номер",
+          "code": "vin",
+          "type": "Text(100)"
+        },
+        {
+          "name": "Экологический класс",
+          "code": "environmentalClass",
+          "type": "Text(100)"
+        },
+        {
+          "name": "Дата государственного регистрационного знака",
+          "code": "dateRegNumber",
+          "type": "Date"
+        },
+        {
+          "characteristicValue": "Ваз",
+          "name": "Марка",
+          "code": "carMarka",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": "21102",
+          "name": "Модель",
+          "code": "carModel",
+          "type": "Text(100)"
+        },
+        {
+          "characteristicValue": {
+            "code": "pryamie",
+            "name": "Прямое",
+            "actual": false
+          },
+          "name": "Назначение",
+          "code": "generalPurpose",
+          "type": "Select"
+        }
+      ],
+      "currencyCode": "643",
+      "etpCode": "ETP_SBAST",
+      "subjectRFCode": "23",
+      "category": {
+        "code": "100001",
+        "name": "Легковые автомобили"
+      },
+      "createDate": "2026-04-04T06:43:26.344+00:00",
+      "timeZoneName": "МСК",
+      "timezoneOffset": "180",
+      "hasAppeals": false,
+      "isStopped": false,
+      "attributes": [
+        {
+          "code": "Lot.DA_typeProperty_EA1041",
+          "fullName": "Вид имущества",
+          "value": {
+            "code": "DA_typeProperty_EA1041_Select_1",
+            "name": "Имущество, обращенное в федеральную собственность"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 551
+        },
+        {
+          "code": "Lot.DA_acquaintanceProperty_EA1041",
+          "fullName": "Сроки и время ознакомления покупателя с имуществом",
+          "value": "Осмотр имущества осуществляется в рабочие дни с 10:00 ч. до 17:00 ч. (время московское) по предварительному согласованию с лицом, ответственным за обеспечение доступа к осмотру имущества, не менее чем за три рабочих дня до предполагаемой даты осмотра, путем направления заявки на осмотр по форме указанной в информационном извещении на электронный адрес info@spektr-ug.ru\nЛицо, ответственное за обеспечение доступа к осмотру имущества: Рыжак Игорь Владимирович, тел: 89184341058.\nОсмотр имущества осуществляется без взимания платы.\n",
+          "attributeType": "Text(1000)",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 553
+        },
+        {
+          "code": "Lot.DA_concludingContract_EA1041",
+          "fullName": "Срок заключения договора купли-продажи",
+          "value": "По результатам проведенного аукциона в электронной форме Организатор аукциона (продавец) и победитель аукциона (покупатель) не ранее 10 рабочих дней и не позднее 15 рабочих дней со дня подведения итогов аукциона заключают договор купли-продажи имущества в электронной форме.",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 554
+        },
+        {
+          "code": "DA_contractType_EA1041",
+          "fullName": "Вид договора",
+          "value": {
+            "code": "1",
+            "name": "Договор купли-продажи"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 554
+        },
+        {
+          "code": "Lot.DA_depositRules_EA1041",
+          "fullName": "Порядок внесения задатка",
+          "value": "Задаток за участие в аукционе должен поступить на специальный счет, открытый потенциальным покупателем в одном из банков, перечень которых устанавливается Правительством Российской Федерации о контрактной системе закупок товаров, работ, услуг для обеспечения государственных и муниципальных нужд. \n Задаток должен поступить не позднее даты окончания приема заявок.\n",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 492
+        },
+        {
+          "code": "Lot.DA_retender_EA1041",
+          "fullName": "Информационное сообщение является повторным в соответствии с п.18 ПП РФ 1041",
+          "value": true,
+          "attributeType": "Checker",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 493
+        },
+        {
+          "code": "Lot.DA_discountSize_EA1041",
+          "fullName": "Размер снижения начальной цены",
+          "value": {
+            "code": "DA_discountSize_EA1041_Select_1",
+            "name": "30%"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 494
+        },
+        {
+          "code": "Lot.DA_discountRule_EA1041",
+          "fullName": "Периодичность снижения начальной цены",
+          "value": "10 рабочих дней",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 495
+        }
+      ],
+      "isAnnulled": false,
+      "noticeFirstVersionPublicationDate": "2026-04-04T10:58:56.087Z",
+      "lotVat": {
+        "code": "includedVAT",
+        "name": "С учетом НДС"
+      },
+      "npaHintCode": "hint1_1041PP_38PP",
+      "typeTransaction": "sale"
+    },
+    {
+      "id": "22000068570000000063_1",
+      "noticeNumber": "22000068570000000063",
+      "lotNumber": 1,
+      "lotStatus": "PUBLISHED",
+      "biddType": {
+        "code": "ZHKH",
+        "name": "Отбор региональных операторов по обращению с ТКО и управляющих организаций для управления МКД"
+      },
+      "biddForm": {
+        "code": "PK",
+        "name": "Конкурс"
+      },
+      "lotName": "Отбор управляющей организации для управления многоквартирными домами",
+      "lotDescription": "Согласно конкурсной документации",
+      "priceMin": 0.0,
+      "priceMinExact": "0.00",
+      "biddEndTime": "2026-05-06T05:00:00.000+00:00",
+      "lotImages": [],
+      "lotVideos": [],
+      "characteristics": [],
+      "subjectRFCode": "89",
+      "category": {
+        "code": "902",
+        "name": "Управление многоквартирными домами"
+      },
+      "createDate": "2026-04-03T21:39:14.320+00:00",
+      "timeZoneName": "МСК+2",
+      "timezoneOffset": "300",
+      "hasAppeals": false,
+      "isStopped": false,
+      "attributes": [
+        {
+          "code": "DA_contractType_PK(MKD)",
+          "fullName": "Вид договора",
+          "value": {
+            "code": "41",
+            "name": "Договор управления многоквартирным домом"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 1
+        },
+        {
+          "code": "DA_Lot.deposit_PK(MKD)",
+          "fullName": "Размер обеспечения заявки",
+          "value": 1039.81,
+          "attributeType": "Money",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2025
+        },
+        {
+          "code": "DA_Lot.basis_PK(MKD)",
+          "fullName": "Основание проведения конкурса и нормативные правовые акты, на основании которых проводится конкурс",
+          "value": "Открытый конкурс проводится в соответствии с Жилищным кодексом Российской Федерации, постановлением Правительства Российской Федерации от 06.02.2006 № 75 «О порядке проведения органом местного самоуправления открытого конкурса по отбору управляющей организации для управления многоквартирным домом» ",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2050
+        },
+        {
+          "code": "DA_Lot.objectCharacteristic_PK(MKD)",
+          "fullName": "Характеристика объекта конкурса",
+          "value": "в соответствии с конкурсной документацией",
+          "attributeType": "Text(1000)",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2075
+        },
+        {
+          "code": "DA_Lot.nameServices_PK(MKD)",
+          "fullName": "Наименование работ и услуг по содержанию и ремонту объекта конкурса",
+          "value": "в соответствии с конкурсной документацией",
+          "attributeType": "Text(1000)",
+          "group": {
+            "code": "NL260",
+            "name": "5.5 Лот_особенности",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2125
+        },
+        {
+          "code": "DA_Lot.amountFee_PK(MKD)",
+          "fullName": "Размер платы за содержание и ремонт жилого помещения",
+          "value": 174.95,
+          "attributeType": "Money",
+          "group": {
+            "code": "NL260",
+            "name": "5.5 Лот_особенности",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2150
+        },
+        {
+          "code": "DA_Lot.listServices_PK(MKD)",
+          "fullName": "Перечень коммунальных услуг, предоставляемых управляющей организацией",
+          "value": "в соответствии с конкурсной документацией",
+          "attributeType": "Text(1000)",
+          "group": {
+            "code": "NL260",
+            "name": "5.5 Лот_особенности",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2175
+        },
+        {
+          "code": "DA_Lot.officialSite_PK(MKD)",
+          "fullName": "Адрес официального сайта, на котором размещена конкурсная документация",
+          "value": "torgi.gov.ru",
+          "attributeType": "Text(100)",
+          "group": {
+            "code": "NL260",
+            "name": "5.5 Лот_особенности",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2200
+        },
+        {
+          "code": "DA_Lot.submissionDocumentation_PK(MKD)",
+          "fullName": "Место и порядок предоставления конкурсной документации, \nразмер, порядок и сроки внесения платы, за предоставление конкурсной документации",
+          "value": "Конкурсная документация предоставляется по адресу: 629640, ЯНАО, Шурышкарский район, с. Мужи ул. Советская 35, каб.№ 108",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL260",
+            "name": "5.5 Лот_особенности",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2225
+        },
+        {
+          "code": "DA_Lot.contractPeriod_PK(MKD)",
+          "fullName": "Срок действия договора",
+          "value": "3 года",
+          "attributeType": "Text(100)",
+          "group": {
+            "code": "NL260",
+            "name": "5.5 Лот_особенности",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2250
+        }
+      ],
+      "noticeAttributes": [
+        {
+          "code": "DA_typeCompetitive_PK(ZHKH)",
+          "fullName": "Вид конкурса",
+          "value": {
+            "code": "MKD",
+            "name": "Конкурсный отбор управляющей организации для управления многоквартирным домом"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "N250",
+            "name": "1.2 Извещение_основные_сведения",
+            "displayGroupType": "NOTICE"
+          },
+          "sortOrder": 100
+        }
+      ],
+      "isAnnulled": false,
+      "noticeFirstVersionPublicationDate": "2026-04-04T10:38:53.743Z",
+      "npaHintCode": "hint2_ZHKH_PK_1",
+      "typeTransaction": "trustManagement"
+    },
+    {
+      "id": "22000068570000000062_1",
+      "noticeNumber": "22000068570000000062",
+      "lotNumber": 1,
+      "lotStatus": "PUBLISHED",
+      "biddType": {
+        "code": "ZHKH",
+        "name": "Отбор региональных операторов по обращению с ТКО и управляющих организаций для управления МКД"
+      },
+      "biddForm": {
+        "code": "PK",
+        "name": "Конкурс"
+      },
+      "lotName": "Отбор управляющей организации для управления многоквартирными домами",
+      "lotDescription": "Согласно конкурсной документации",
+      "priceMin": 0.0,
+      "priceMinExact": "0.00",
+      "biddEndTime": "2026-05-06T05:00:00.000+00:00",
+      "lotImages": [],
+      "lotVideos": [],
+      "characteristics": [],
+      "subjectRFCode": "89",
+      "category": {
+        "code": "902",
+        "name": "Управление многоквартирными домами"
+      },
+      "createDate": "2026-04-03T21:27:38.930+00:00",
+      "timeZoneName": "МСК+2",
+      "timezoneOffset": "300",
+      "hasAppeals": false,
+      "isStopped": false,
+      "attributes": [
+        {
+          "code": "DA_contractType_PK(MKD)",
+          "fullName": "Вид договора",
+          "value": {
+            "code": "41",
+            "name": "Договор управления многоквартирным домом"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "NL250",
+            "name": "5.3 Лот_основная_информация",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 1
+        },
+        {
+          "code": "DA_Lot.deposit_PK(MKD)",
+          "fullName": "Размер обеспечения заявки",
+          "value": 284.08,
+          "attributeType": "Money",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2025
+        },
+        {
+          "code": "DA_Lot.basis_PK(MKD)",
+          "fullName": "Основание проведения конкурса и нормативные правовые акты, на основании которых проводится конкурс",
+          "value": "Открытый конкурс проводится в соответствии с Жилищным кодексом Российской Федерации, постановлением Правительства Российской Федерации от 06.02.2006 № 75 «О порядке проведения органом местного самоуправления открытого конкурса по отбору управляющей организации для управления многоквартирным домом» ",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2050
+        },
+        {
+          "code": "DA_Lot.objectCharacteristic_PK(MKD)",
+          "fullName": "Характеристика объекта конкурса",
+          "value": "в соответствии с конкурсной документацией",
+          "attributeType": "Text(1000)",
+          "group": {
+            "code": "NL255",
+            "name": "5.4.2 Лот_информация_о_задатке_дин",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2075
+        },
+        {
+          "code": "DA_Lot.nameServices_PK(MKD)",
+          "fullName": "Наименование работ и услуг по содержанию и ремонту объекта конкурса",
+          "value": "в соответствии с конкурсной документацией",
+          "attributeType": "Text(1000)",
+          "group": {
+            "code": "NL260",
+            "name": "5.5 Лот_особенности",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2125
+        },
+        {
+          "code": "DA_Lot.amountFee_PK(MKD)",
+          "fullName": "Размер платы за содержание и ремонт жилого помещения",
+          "value": 35.27,
+          "attributeType": "Money",
+          "group": {
+            "code": "NL260",
+            "name": "5.5 Лот_особенности",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2150
+        },
+        {
+          "code": "DA_Lot.listServices_PK(MKD)",
+          "fullName": "Перечень коммунальных услуг, предоставляемых управляющей организацией",
+          "value": "в соответствии с конкурсной документацией",
+          "attributeType": "Text(1000)",
+          "group": {
+            "code": "NL260",
+            "name": "5.5 Лот_особенности",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2175
+        },
+        {
+          "code": "DA_Lot.officialSite_PK(MKD)",
+          "fullName": "Адрес официального сайта, на котором размещена конкурсная документация",
+          "value": "torgi.gov.ru",
+          "attributeType": "Text(100)",
+          "group": {
+            "code": "NL260",
+            "name": "5.5 Лот_особенности",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2200
+        },
+        {
+          "code": "DA_Lot.submissionDocumentation_PK(MKD)",
+          "fullName": "Место и порядок предоставления конкурсной документации, \nразмер, порядок и сроки внесения платы, за предоставление конкурсной документации",
+          "value": "Конкурсная документация предоставляется по адресу: 629640, ЯНАО, Шурышкарский район, с. Мужи ул. Советская 35, каб.№ 108",
+          "attributeType": "Text(500)",
+          "group": {
+            "code": "NL260",
+            "name": "5.5 Лот_особенности",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2225
+        },
+        {
+          "code": "DA_Lot.contractPeriod_PK(MKD)",
+          "fullName": "Срок действия договора",
+          "value": "3 года",
+          "attributeType": "Text(100)",
+          "group": {
+            "code": "NL260",
+            "name": "5.5 Лот_особенности",
+            "displayGroupType": "LOT"
+          },
+          "sortOrder": 2250
+        }
+      ],
+      "noticeAttributes": [
+        {
+          "code": "DA_typeCompetitive_PK(ZHKH)",
+          "fullName": "Вид конкурса",
+          "value": {
+            "code": "MKD",
+            "name": "Конкурсный отбор управляющей организации для управления многоквартирным домом"
+          },
+          "attributeType": "Select",
+          "group": {
+            "code": "N250",
+            "name": "1.2 Извещение_основные_сведения",
+            "displayGroupType": "NOTICE"
+          },
+          "sortOrder": 100
+        }
+      ],
+      "isAnnulled": false,
+      "noticeFirstVersionPublicationDate": "2026-04-04T10:37:25.308Z",
+      "npaHintCode": "hint2_ZHKH_PK_1",
+      "typeTransaction": "trustManagement"
+    }
+  ],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 5,
+    "sort": {
+      "sorted": true,
+      "unsorted": false,
+      "empty": false
+    },
+    "offset": 0,
+    "paged": true,
+    "unpaged": false
+  },
+  "categoryFacet": [],
+  "totalElements": 10000,
+  "last": false,
+  "totalPages": 2000,
+  "numberOfElements": 5,
+  "first": true,
+  "size": 5,
+  "number": 0,
+  "sort": {
+    "sorted": true,
+    "unsorted": false,
+    "empty": false
+  },
+  "empty": false
+}

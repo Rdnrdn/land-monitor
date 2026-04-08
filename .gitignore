@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+staticfiles/
+media/
+.DS_Store
+.vscode/
+.idea/
+*.log
+*.tar.gz

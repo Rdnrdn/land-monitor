@@ -1,0 +1,38 @@
+[
+  {
+    "source_lot_id": "21000005710000001078_1",
+    "title": "земельный участок, местоположение: Российская Федерация, Московская область, Рузский муниципальный округ, д.Шелковка, площадь 1649 кв.м, разрешенное использование: для ведения личного подсобного хозяйства (приусадебный земельный участок)",
+    "noticeNumber": "21000005710000001078",
+    "lot_url": "https://torgi.gov.ru/new/public/lots/lot/21000005710000001078_1",
+    "attempted_notice_url": "https://torgi.gov.ru/new/api/public/notices/noticeNumber/21000005710000001078",
+    "public_notice_url": "https://torgi.gov.ru/new/public/notices/view/21000005710000001078",
+    "notice_fetch_status": "error",
+    "notice_fetch_error": "HTTPError('503 Server Error: Service Temporarily Unavailable for url: https://torgi.gov.ru/new/api/public/notices/noticeNumber/21000005710000001078')",
+    "short_error_message": "503 Server Error: Service Temporarily Unavailable for url: https://torgi.gov.ru/new/api/public/notices/noticeNumber/21000005710000001078",
+    "notice_number_missing": false
+  },
+  {
+    "source_lot_id": "21000005710000001078_1",
+    "title": "земельный участок, местоположение: Российская Федерация, Московская область, Рузский муниципальный округ, д.Шелковка, площадь 1649 кв.м, разрешенное использование: для ведения личного подсобного хозяйства (приусадебный земельный участок)",
+    "noticeNumber": "21000005710000001078",
+    "lot_url": "https://torgi.gov.ru/new/public/lots/lot/21000005710000001078_1",
+    "attempted_notice_url": "https://torgi.gov.ru/new/api/public/notices/noticeNumber/21000005710000001078",
+    "public_notice_url": "https://torgi.gov.ru/new/public/notices/view/21000005710000001078",
+    "notice_fetch_status": "empty_notice",
+    "notice_fetch_error": null,
+    "short_error_message": null,
+    "notice_number_missing": false
+  },
+  {
+    "source_lot_id": "21000005710000001078_1",
+    "title": "земельный участок, местоположение: Российская Федерация, Московская область, Рузский муниципальный округ, д.Шелковка, площадь 1649 кв.м, разрешенное использование: для ведения личного подсобного хозяйства (приусадебный земельный участок)",
+    "noticeNumber": "21000005710000001078",
+    "lot_url": "https://torgi.gov.ru/new/public/lots/lot/21000005710000001078_1",
+    "attempted_notice_url": "https://torgi.gov.ru/new/api/public/notices/noticeNumber/21000005710000001078",
+    "public_notice_url": "https://torgi.gov.ru/new/public/notices/view/21000005710000001078",
+    "notice_fetch_status": "empty_notice",
+    "notice_fetch_error": null,
+    "short_error_message": null,
+    "notice_number_missing": false
+  }
+]

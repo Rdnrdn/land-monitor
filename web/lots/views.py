@@ -1,6 +1,7 @@
 import uuid
 
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -109,7 +110,7 @@ def _get_or_create_user_lot(lot: Lot) -> tuple[UserLot, bool]:
         return UserLot.objects.get(lot=lot), False
 
 
-class LotListView(ListView):
+class LotListView(LoginRequiredMixin, ListView):
     model = Lot
     template_name = "lots/lot_list.html"
     context_object_name = "lots"
@@ -230,7 +231,7 @@ class LotListView(ListView):
         return context
 
 
-class LotDetailView(DetailView):
+class LotDetailView(LoginRequiredMixin, DetailView):
     model = Lot
     template_name = "lots/lot_detail.html"
     context_object_name = "lot"
@@ -243,7 +244,7 @@ class LotDetailView(DetailView):
         return context
 
 
-class LotQuickActionView(View):
+class LotQuickActionView(LoginRequiredMixin, View):
     def post(self, request: HttpRequest, pk: int) -> HttpResponseRedirect:
         lot = get_object_or_404(Lot, pk=pk)
         action = request.POST.get("action", "")

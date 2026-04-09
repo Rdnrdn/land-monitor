@@ -75,6 +75,19 @@
             color: var(--muted);
             font-size: 0.95rem;
         }
+        .topbar__actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .topbar__meta {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
         .page {
             padding: 28px 0 44px;
         }
@@ -265,6 +278,13 @@
             background: rgba(255, 255, 255, 0.88);
             color: var(--text);
             font: inherit;
+        }
+        .topbar__logout {
+            margin: 0;
+        }
+        .topbar__logout button {
+            min-height: 36px;
+            padding: 0 12px;
         }
         .pagination {
             display: flex;
@@ -509,6 +529,39 @@
             font-size: 0.92rem;
             color: var(--muted);
         }
+        .auth-shell {
+            width: min(460px, 100%);
+            margin: 48px auto 0;
+        }
+        .auth-card {
+            display: grid;
+            gap: 18px;
+        }
+        .auth-card__header {
+            display: grid;
+            gap: 10px;
+        }
+        .auth-card__title {
+            margin: 0;
+            font-size: 1.55rem;
+            line-height: 1.15;
+        }
+        .auth-card__subtitle {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+        .auth-card__footer {
+            font-size: 0.92rem;
+            color: var(--muted);
+        }
+        .form-errors {
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid #e7c4bc;
+            background: var(--danger-soft);
+            color: #7d2d22;
+        }
         @media (max-width: 1024px) {
             .filters {
                 grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -537,6 +590,9 @@
                 flex-direction: column;
                 align-items: stretch;
             }
+            .topbar__actions {
+                justify-content: flex-start;
+            }
             .filters {
                 grid-template-columns: 1fr;
             }
@@ -556,8 +612,21 @@
 <body>
     <header class="topbar">
         <div class="topbar__inner">
-            <h1 class="brand"><a href="{% url 'lots:list' %}">Land Monitor</a></h1>
-            <span class="topbar__caption">Лоты и пользовательский статус</span>
+            <div class="topbar__meta">
+                <h1 class="brand"><a href="{% url 'lots:list' %}">Land Monitor</a></h1>
+                <span class="topbar__caption">Лоты и пользовательский статус</span>
+            </div>
+            <div class="topbar__actions">
+                {% if request.user.is_authenticated %}
+                    <span class="badge badge--accent">{{ request.user.username }}</span>
+                    <form method="post" action="{% url 'logout' %}" class="topbar__logout">
+                        {% csrf_token %}
+                        <button type="submit" class="button button--ghost">Выйти</button>
+                    </form>
+                {% else %}
+                    <a class="button button--ghost" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Войти</a>
+                {% endif %}
+            </div>
         </div>
     </header>
     <main class="page">

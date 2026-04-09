@@ -15,16 +15,19 @@ from sqlalchemy.dialects.postgresql import insert
 
 from land_monitor.db import SessionLocal
 from land_monitor.models import Lot, Notice
+from land_monitor.services.municipalities import sync_lot_municipality_refs
+from land_monitor.services.regions import sync_lot_region_refs
 
 
 API_URL = "https://torgi.gov.ru/new/api/public/lotcards/search"
 BASE_PARAMS = {
-    "dynSubjRF": "53",
     "catCode": "2",
     "lotStatus": "PUBLISHED,APPLICATIONS_SUBMISSION",
     "sort": "firstVersionPublicationDate,desc",
     "withFacets": "false",
 }
+DEFAULT_REGION_CODE = "53"
+DEFAULT_REGION_NAME = "Московская область"
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -142,11 +145,13 @@ def _fetch_page(
     page: int,
     size: int,
     *,
+    region_code: str,
     retry_count: int,
     backoff: list[float],
     delay: float,
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, str | None, float]:
     params = dict(BASE_PARAMS)
+    params["dynSubjRF"] = region_code
     params["page"] = page
     params["size"] = size
     last_error: Exception | None = None
@@ -207,7 +212,12 @@ def _fetch_page(
     return [], None, None, time.monotonic() - start
 
 
-def _build_payload(raw: dict[str, Any]) -> dict[str, Any]:
+def _build_payload(
+    raw: dict[str, Any],
+    *,
+    fallback_region_name: str,
+    fallback_region_code: str,
+) -> dict[str, Any]:
     source_lot_id = _pick_first(raw, ["id", "lotId", "lotNumber", "noticeNumber"])
     if not source_lot_id:
         raise ValueError("source_lot_id is required")
@@ -261,7 +271,9 @@ def _build_payload(raw: dict[str, Any]) -> dict[str, Any]:
         "title": _extract_text(_pick_first(raw, ["lotName"])),
         "description": _extract_text(_pick_first(raw, ["lotDescription"])),
         "lot_status_external": lot_status_external,
-        "region_name": _extract_text(_pick_first(raw, ["region"])) or "Московская область",
+        "region": _extract_text(_pick_first(raw, ["region"])) or fallback_region_name,
+        "region_name": _extract_text(_pick_first(raw, ["region"])) or fallback_region_name,
+        "source_torgi_region_code": fallback_region_code,
         "address": _extract_text(_pick_first(raw, ["estateAddress"])) or _extract_text(_pick_first(raw, ["address"])),
         "subject_rf_code": _extract_text(_pick_first(raw, ["subjectRFCode"])),
         "cadastre_number": cadastre_number,
@@ -303,6 +315,154 @@ def _upsert_batch(db, items: list[dict[str, Any]]) -> int:
     return len(result.fetchall())
 
 
+def fetch_region_lots(
+    *,
+    region_code: str,
+    region_name: str,
+    stdout,
+    limit: int | None,
+    start_page: int,
+    max_pages: int | None,
+) -> dict[str, int | str | None]:
+    size = 50
+    backoff = [3.0, 7.0, 15.0]
+    retry_count = 3
+    delay = 0.7
+
+    session = requests.Session()
+    total_loaded = 0
+    inserted = 0
+    updated = 0
+    stop_reason = None
+
+    page = start_page
+    pages_processed = 0
+    last_page_processed = None
+    db = SessionLocal()
+    try:
+        while True:
+            if limit is not None and total_loaded >= limit:
+                stop_reason = "limit_reached"
+                break
+            if max_pages is not None and pages_processed >= max_pages:
+                stop_reason = "max_pages_reached"
+                break
+            stdout.write(f"region={region_name} region_code={region_code} page_start={page}")
+            stdout.write(f"region={region_name} before_fetch page={page}")
+            items, meta, fetch_error, elapsed = _fetch_page(
+                session,
+                page=page,
+                size=size,
+                region_code=region_code,
+                retry_count=retry_count,
+                backoff=backoff,
+                delay=delay,
+            )
+            stdout.write(
+                f"region={region_name} after_fetch page={page} fetched_items={len(items)} elapsed={elapsed:.2f}"
+            )
+            if not items:
+                stop_reason = "http_503" if fetch_error == "http_503" else "empty_page"
+                stdout.write(
+                    f"region={region_name} page={page} fetched_items=0 "
+                    f"totalElements={meta['totalElements'] if meta else None} "
+                    f"totalPages={meta['totalPages'] if meta else None} last={meta['last'] if meta else None} "
+                    f"total_loaded={total_loaded}"
+                )
+                break
+            if limit is not None and total_loaded + len(items) > limit:
+                items = items[: max(0, limit - total_loaded)]
+
+            raw_notice_numbers = {
+                str(_pick_first(item, ["noticeNumber", "noticeId"]))
+                for item in items
+                if _pick_first(item, ["noticeNumber", "noticeId"]) is not None
+            }
+            if raw_notice_numbers:
+                stmt = insert(Notice).values(
+                    [{"notice_number": num} for num in raw_notice_numbers]
+                )
+                stmt = stmt.on_conflict_do_nothing(
+                    index_elements=[Notice.notice_number]
+                )
+                db.execute(stmt)
+
+            payloads = []
+            for raw in items:
+                try:
+                    payload = _build_payload(
+                        raw,
+                        fallback_region_name=region_name,
+                        fallback_region_code=region_code,
+                    )
+                    if "last_seen_at" in Lot.__table__.columns:
+                        payload["last_seen_at"] = datetime.utcnow()
+                    payloads.append(payload)
+                except Exception:
+                    continue
+
+            if not payloads:
+                stop_reason = "payloads_empty"
+                stdout.write(
+                    f"region={region_name} page={page} fetched_items={len(items)} "
+                    f"totalElements={meta['totalElements'] if meta else None} "
+                    f"totalPages={meta['totalPages'] if meta else None} last={meta['last'] if meta else None} "
+                    f"total_loaded={total_loaded}"
+                )
+                break
+
+            keys = [(p["source"], p["source_lot_id"]) for p in payloads]
+            existing_keys = set(
+                db.execute(
+                    select(Lot.source, Lot.source_lot_id).where(
+                        tuple_(Lot.source, Lot.source_lot_id).in_(keys)
+                    )
+                ).all()
+            )
+
+            stdout.write(f"region={region_name} before_upsert page={page} payloads={len(payloads)}")
+            upserted = _upsert_batch(db, payloads)
+            sync_lot_region_refs(db)
+            sync_lot_municipality_refs(db)
+            db.commit()
+            total_loaded += len(payloads)
+            inserted += sum(1 for key in keys if key not in existing_keys)
+            updated += max(upserted - (len(keys) - len(existing_keys)), 0)
+            stdout.write(f"region={region_name} after_commit page={page} total_loaded={total_loaded}")
+
+            stdout.write(
+                f"region={region_name} page={page} fetched_items={len(items)} "
+                f"totalElements={meta['totalElements'] if meta else None} "
+                f"totalPages={meta['totalPages'] if meta else None} last={meta['last'] if meta else None} "
+                f"total_loaded={total_loaded}"
+            )
+
+            last_page_processed = page
+            pages_processed += 1
+            if meta and meta.get("last") is True:
+                stop_reason = "last_page"
+                break
+            page += 1
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+        session.close()
+
+    return {
+        "region_name": region_name,
+        "region_code": region_code,
+        "total_loaded": total_loaded,
+        "inserted": inserted,
+        "updated": updated,
+        "pages_processed": pages_processed,
+        "start_page": start_page,
+        "end_page": last_page_processed if last_page_processed is not None else start_page - 1,
+        "stop_reason": stop_reason,
+    }
+
+
 class Command(BaseCommand):
     help = "Fetch lots for Moscow region and upsert into lots table."
 
@@ -315,120 +475,14 @@ class Command(BaseCommand):
         limit = int(options["limit"])
         start_page = int(options["start_page"])
         max_pages = int(options["max_pages"])
-        size = 50
-        backoff = [3.0, 7.0, 15.0]
-        retry_count = 3
-        delay = 0.7
-
-        session = requests.Session()
-        total_loaded = 0
-        inserted = 0
-        updated = 0
-        stop_reason = None
-
-        page = start_page
-        pages_processed = 0
-        last_page_processed = None
-        db = SessionLocal()
-        try:
-            while total_loaded < limit and pages_processed < max_pages:
-                self.stdout.write(f"page_start={page}")
-                self.stdout.write(f"before_fetch page={page}")
-                items, meta, fetch_error, elapsed = _fetch_page(
-                    session,
-                    page=page,
-                    size=size,
-                    retry_count=retry_count,
-                    backoff=backoff,
-                    delay=delay,
-                )
-                self.stdout.write(
-                    f"after_fetch page={page} fetched_items={len(items)} elapsed={elapsed:.2f}"
-                )
-                if not items:
-                    stop_reason = "http_503" if fetch_error == "http_503" else "empty_page"
-                    self.stdout.write(
-                        f"page={page} fetched_items=0 totalElements={meta['totalElements'] if meta else None} "
-                        f"totalPages={meta['totalPages'] if meta else None} last={meta['last'] if meta else None} "
-                        f"total_loaded={total_loaded}"
-                    )
-                    break
-                if total_loaded + len(items) > limit:
-                    items = items[: max(0, limit - total_loaded)]
-
-                raw_notice_numbers = {
-                    str(_pick_first(item, ["noticeNumber", "noticeId"]))
-                    for item in items
-                    if _pick_first(item, ["noticeNumber", "noticeId"]) is not None
-                }
-                if raw_notice_numbers:
-                    stmt = insert(Notice).values(
-                        [{"notice_number": num} for num in raw_notice_numbers]
-                    )
-                    stmt = stmt.on_conflict_do_nothing(
-                        index_elements=[Notice.notice_number]
-                    )
-                    db.execute(stmt)
-
-                payloads = []
-                for raw in items:
-                    try:
-                        payload = _build_payload(raw)
-                        if "last_seen_at" in Lot.__table__.columns:
-                            payload["last_seen_at"] = datetime.utcnow()
-                        payloads.append(payload)
-                    except Exception:
-                        continue
-
-                if not payloads:
-                    stop_reason = "payloads_empty"
-                    self.stdout.write(
-                        f"page={page} fetched_items={len(items)} totalElements={meta['totalElements'] if meta else None} "
-                        f"totalPages={meta['totalPages'] if meta else None} last={meta['last'] if meta else None} "
-                        f"total_loaded={total_loaded}"
-                    )
-                    break
-
-                keys = [(p["source"], p["source_lot_id"]) for p in payloads]
-                existing_keys = set(
-                    db.execute(
-                        select(Lot.source, Lot.source_lot_id).where(
-                            tuple_(Lot.source, Lot.source_lot_id).in_(keys)
-                        )
-                    ).all()
-                )
-
-                self.stdout.write(f"before_upsert page={page} payloads={len(payloads)}")
-                upserted = _upsert_batch(db, payloads)
-                db.commit()
-                total_loaded += len(payloads)
-                inserted += sum(1 for key in keys if key not in existing_keys)
-                updated += max(upserted - (len(keys) - len(existing_keys)), 0)
-                self.stdout.write(f"after_commit page={page} total_loaded={total_loaded}")
-
-                self.stdout.write(
-                    f"page={page} fetched_items={len(items)} totalElements={meta['totalElements'] if meta else None} "
-                    f"totalPages={meta['totalPages'] if meta else None} last={meta['last'] if meta else None} "
-                    f"total_loaded={total_loaded}"
-                )
-
-                last_page_processed = page
-                pages_processed += 1
-                if meta and meta.get("last") is True:
-                    stop_reason = "last_page"
-                    break
-                if total_loaded >= limit:
-                    stop_reason = "limit_reached"
-                    break
-                page += 1
-            else:
-                if pages_processed >= max_pages:
-                    stop_reason = "max_pages_reached"
-        except Exception:
-            db.rollback()
-            raise
-        finally:
-            db.close()
+        result = fetch_region_lots(
+            region_code=DEFAULT_REGION_CODE,
+            region_name=DEFAULT_REGION_NAME,
+            stdout=self.stdout,
+            limit=limit,
+            start_page=start_page,
+            max_pages=max_pages,
+        )
 
         db = SessionLocal()
         try:
@@ -442,14 +496,14 @@ class Command(BaseCommand):
         finally:
             db.close()
 
-        self.stdout.write(f"total_loaded={total_loaded}")
-        self.stdout.write(f"inserted={inserted}")
-        self.stdout.write(f"updated={updated}")
+        self.stdout.write(f"total_loaded={result['total_loaded']}")
+        self.stdout.write(f"inserted={result['inserted']}")
+        self.stdout.write(f"updated={result['updated']}")
         self.stdout.write(f"total_rows_in_db={total_rows_in_db}")
-        self.stdout.write(f"start_page={start_page}")
-        self.stdout.write(f"end_page={last_page_processed if last_page_processed is not None else start_page - 1}")
-        self.stdout.write(f"pages_processed={pages_processed}")
-        self.stdout.write(f"stop_reason={stop_reason}")
+        self.stdout.write(f"start_page={result['start_page']}")
+        self.stdout.write(f"end_page={result['end_page']}")
+        self.stdout.write(f"pages_processed={result['pages_processed']}")
+        self.stdout.write(f"stop_reason={result['stop_reason']}")
         for lot in examples:
             self.stdout.write(
                 f"example id={lot.id} source_lot_id={lot.source_lot_id} "

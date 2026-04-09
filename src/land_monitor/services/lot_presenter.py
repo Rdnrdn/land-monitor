@@ -47,6 +47,13 @@ def _map_status_label(status_raw: str | None) -> str | None:
     return STATUS_LABELS.get(status_raw, status_raw)
 
 
+def _lot_region_name(lot: Lot) -> str | None:
+    region_ref = getattr(lot, "region_ref", None)
+    if region_ref is not None:
+        return region_ref.name
+    return lot.region_name or lot.region
+
+
 def build_lot_response(lot: Lot, notice: Notice | None) -> dict[str, Any]:
     auction_site_url = getattr(notice, "auction_site_url", None) if notice else None
     application_portal_url = getattr(notice, "application_portal_url", None) if notice else None
@@ -92,9 +99,9 @@ def build_lot_response(lot: Lot, notice: Notice | None) -> dict[str, Any]:
     }
 
     location = {
-        "region_name": lot.region_name or lot.region,
+        "region_name": _lot_region_name(lot),
         "municipality_name": lot.municipality_name,
-        "label": lot.municipality_name or lot.region_name or lot.region,
+        "label": lot.municipality_name or _lot_region_name(lot),
     }
 
     price = {
@@ -115,7 +122,7 @@ def build_lot_response(lot: Lot, notice: Notice | None) -> dict[str, Any]:
         "lot_status_external": lot.lot_status_external,
         "status_label": _map_status_label(lot.lot_status_external),
         "status": status,
-        "region_name": lot.region_name or lot.region,
+        "region_name": _lot_region_name(lot),
         "municipality_name": lot.municipality_name,
         "location": location,
         "price_min": lot.price_min,

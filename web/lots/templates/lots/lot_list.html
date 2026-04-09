@@ -1,4 +1,5 @@
 {% extends "lots/base.html" %}
+{% load lot_labels %}
 
 {% block title %}Лоты | Land Monitor{% endblock %}
 
@@ -24,13 +25,6 @@
                     <div class="metric__value">{{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</div>
                     <div class="metric__hint">По {{ page_obj.paginator.per_page }} лотов</div>
                 </div>
-                <div class="metric">
-                    <div class="metric__label">Активные фильтры</div>
-                    <div class="metric__value">{{ active_filter_count }}</div>
-                    <div class="metric__hint">
-                        {% if has_active_filters %}Есть ограничение выдачи{% else %}Показан базовый список{% endif %}
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -50,11 +44,16 @@
             <div class="toolbar" style="margin-bottom: 16px;">
                 <div>
                     <h3 style="margin: 0;">Фильтры</h3>
-                    <div class="filters__hint">Все фильтры работают через GET-параметры и не меняют текущую Django-логику.</div>
                 </div>
                 <div class="toolbar__meta">
-                    <span class="badge">Сортировка: {{ current_ordering_label }}</span>
-                    <span class="badge">Без frontend runtime</span>
+                    <div class="field field--compact" style="min-width: 150px;">
+                        <label for="id_per_page">Показывать</label>
+                        <select id="id_per_page" name="per_page" data-auto-submit>
+                            {% for value in per_page_options %}
+                                <option value="{{ value }}" {% if current_per_page == value %}selected{% endif %}>{{ value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -63,11 +62,23 @@
                     <label for="id_region">Регион</label>
                     <select id="id_region" name="region" data-auto-submit>
                         <option value="">Все регионы</option>
-                        {% for value in region_options %}
-                            <option value="{{ value }}" {% if request.GET.region == value %}selected{% endif %}>{{ value }}</option>
+                        {% for region in region_options %}
+                            <option value="{{ region.slug }}" {% if selected_region and selected_region.pk == region.pk %}selected{% endif %}>{{ region.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
+                {% if show_municipality_filter %}
+                    <div class="field field--compact">
+                        <label for="id_municipality">Муниципалитет</label>
+                        <select id="id_municipality" name="municipality" multiple size="5" data-auto-submit>
+                            {% for municipality in municipality_options %}
+                                <option value="{{ municipality.slug }}" {% if municipality.slug in selected_municipality_slugs %}selected{% endif %}>
+                                    {{ municipality.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endif %}
                 <div class="field field--compact">
                     <label for="id_status">Статус лота</label>
                     <select id="id_status" name="status" data-auto-submit>
@@ -94,7 +105,7 @@
                     <input id="id_price_max" type="number" step="0.01" name="price_max" value="{{ request.GET.price_max }}" placeholder="Например, 5000000" data-debounce-submit>
                 </div>
                 <div class="field field--compact">
-                    <label for="id_ordering_mirror">Порядок</label>
+                    <label for="id_ordering_mirror">Сортировка</label>
                     <select id="id_ordering_mirror" name="ordering" data-auto-submit>
                         {% for value, label in ordering_options %}
                             <option value="{{ value }}" {% if current_ordering == value %}selected{% endif %}>{{ label }}</option>
@@ -105,8 +116,10 @@
 
             <div class="filters__footer">
                 <div class="toolbar__meta">
-                    <span class="badge">Таб: {{ current_tab }}</span>
-                    {% if request.GET.region %}<span class="badge">{{ request.GET.region }}</span>{% endif %}
+                    {% if selected_region %}<span class="badge">{{ selected_region.name }}</span>{% elif request.GET.region %}<span class="badge">{{ request.GET.region }}</span>{% endif %}
+                    {% if show_municipality_filter and selected_municipality_slugs|length %}
+                        <span class="badge">Муниципалитеты: {{ selected_municipality_slugs|length }}</span>
+                    {% endif %}
                     {% if request.GET.status %}<span class="badge">{{ request.GET.status }}</span>{% endif %}
                     {% if request.GET.price_min or request.GET.price_max %}<span class="badge">Цена</span>{% endif %}
                 </div>
@@ -115,6 +128,9 @@
                     <a class="button button--ghost" href="?tab={{ current_tab }}">Сбросить фильтры</a>
                 </div>
             </div>
+            {% if show_municipality_filter %}
+                <div class="filters__hint">Муниципалитеты доступны только для Московской области. Можно выбрать несколько значений.</div>
+            {% endif %}
         </form>
     </div>
 </section>
@@ -164,7 +180,6 @@
                                 {% if lot.source_url %}
                                     <a class="button button--ghost" href="{{ lot.source_url }}" target="_blank" rel="noreferrer">Источник</a>
                                 {% endif %}
-                                <a class="button button--ghost" href="{% url 'lots:detail' lot.pk %}">Открыть</a>
                             </div>
                         </div>
 
@@ -173,7 +188,7 @@
                                 <div class="meta-tile__label">Цена</div>
                                 <div class="meta-tile__value meta-tile__value--price">
                                     {% if lot.price_min %}
-                                        {{ lot.price_min|floatformat:0 }} {{ lot.currency_code|default:"руб." }}
+                                        {{ lot.price_min|floatformat:0 }} {{ lot.currency_code|currency_label|default:"руб." }}
                                     {% else %}
                                         —
                                     {% endif %}
@@ -181,11 +196,16 @@
                             </div>
                             <div class="meta-tile">
                                 <div class="meta-tile__label">Регион</div>
-                                <div class="meta-tile__value">{{ lot.region|default:"—" }}</div>
+                                <div class="meta-tile__value">{{ lot.region_display|default:"—" }}</div>
+                                {% with municipality_name=lot.municipality_ref.name|default:lot.municipality_name %}
+                                    {% if municipality_name %}
+                                        <div class="meta-tile__subvalue">{{ municipality_name }}</div>
+                                    {% endif %}
+                                {% endwith %}
                             </div>
                             <div class="meta-tile">
                                 <div class="meta-tile__label">Статус</div>
-                                <div class="meta-tile__value">{{ lot.lot_status_external|default:"—" }}</div>
+                                <div class="meta-tile__value">{{ lot.lot_status_external|lot_status_label|default:"—" }}</div>
                             </div>
                             <div class="meta-tile">
                                 <div class="meta-tile__label">Тип</div>
@@ -206,7 +226,7 @@
                                 <span class="detail-chip__label">Пользовательский статус</span>
                                 <span class="detail-chip__value">
                                     {% if lot.user_lot_state %}
-                                        {{ lot.user_lot_state.get_user_status_display }}
+                                        {{ lot.user_lot_state.user_status|user_status_label }}
                                     {% else %}
                                         Не задан
                                     {% endif %}
@@ -228,7 +248,7 @@
                                 {% endif %}
                             </div>
                             <div class="inline-actions">
-                                <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+                                <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form" data-preserve-scroll>
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="toggle_favorite">
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -236,36 +256,35 @@
                                         {% if lot.user_lot_state and lot.user_lot_state.is_favorite %}Убрать избранное{% else %}В избранное{% endif %}
                                     </button>
                                 </form>
-                                <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+                                <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form" data-preserve-scroll>
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="toggle_needs_inspection">
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                     <button type="submit">Осмотр</button>
                                 </form>
-                                <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+                                <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form" data-preserve-scroll>
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="toggle_needs_legal_check">
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                     <button type="submit">Юр. проверка</button>
                                 </form>
-                                <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+                                <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form" data-preserve-scroll>
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="toggle_deposit_paid">
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                     <button type="submit">Задаток</button>
                                 </form>
-                                <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+                                <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form" data-preserve-scroll>
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="set_status">
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                    <select name="user_status">
+                                    <select name="user_status" aria-label="Статус" onchange="this.form.submit()">
                                         {% for value, label in user_status_choices %}
                                             <option value="{{ value }}" {% if lot.user_lot_state and lot.user_lot_state.user_status == value %}selected{% endif %}>
-                                                {{ label }}
+                                                {{ value|user_status_label }}
                                             </option>
                                         {% endfor %}
                                     </select>
-                                    <button type="submit">Статус</button>
                                 </form>
                             </div>
                         </div>
@@ -306,28 +325,41 @@
 {% block extra_scripts %}
 <script>
     (function () {
-        const form = document.querySelector("[data-filter-form]");
-        if (!form) {
-            return;
+        const scrollStorageKey = "land-monitor:list-scroll:" + window.location.pathname + window.location.search;
+        const savedScrollY = window.sessionStorage.getItem(scrollStorageKey);
+        if (savedScrollY !== null) {
+            window.sessionStorage.removeItem(scrollStorageKey);
+            window.requestAnimationFrame(() => {
+                window.scrollTo(0, Number(savedScrollY));
+            });
         }
 
-        const submit = () => {
-            if (typeof form.requestSubmit === "function") {
-                form.requestSubmit();
-                return;
-            }
-            form.submit();
-        };
+        const form = document.querySelector("[data-filter-form]");
+        if (form) {
+            const submit = () => {
+                if (typeof form.requestSubmit === "function") {
+                    form.requestSubmit();
+                    return;
+                }
+                form.submit();
+            };
 
-        form.querySelectorAll("[data-auto-submit]").forEach((element) => {
-            element.addEventListener("change", submit);
-        });
+            form.querySelectorAll("[data-auto-submit]").forEach((element) => {
+                element.addEventListener("change", submit);
+            });
 
-        let timerId = null;
-        form.querySelectorAll("[data-debounce-submit]").forEach((element) => {
-            element.addEventListener("input", () => {
-                window.clearTimeout(timerId);
-                timerId = window.setTimeout(submit, 350);
+            let timerId = null;
+            form.querySelectorAll("[data-debounce-submit]").forEach((element) => {
+                element.addEventListener("input", () => {
+                    window.clearTimeout(timerId);
+                    timerId = window.setTimeout(submit, 350);
+                });
+            });
+        }
+
+        document.querySelectorAll("form[data-preserve-scroll]").forEach((quickActionForm) => {
+            quickActionForm.addEventListener("submit", () => {
+                window.sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
             });
         });
     })();

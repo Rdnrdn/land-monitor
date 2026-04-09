@@ -13,6 +13,44 @@ class UserLotStatus(models.TextChoices):
     ARCHIVE = "ARCHIVE", "ARCHIVE"
 
 
+class Region(models.Model):
+    name = models.CharField(max_length=255)
+    slug = models.CharField(max_length=100)
+    torgi_region_code = models.IntegerField()
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        managed = False
+        db_table = "regions"
+        ordering = ("sort_order", "name")
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class Municipality(models.Model):
+    region = models.ForeignKey(
+        Region,
+        models.DO_NOTHING,
+        db_column="region_id",
+        related_name="municipalities",
+    )
+    name = models.CharField(max_length=255)
+    normalized_name = models.CharField(max_length=255)
+    slug = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        managed = False
+        db_table = "municipalities"
+        ordering = ("region_id", "sort_order", "name")
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Lot(models.Model):
     id = models.BigIntegerField(primary_key=True)
     source = models.TextField()
@@ -20,7 +58,26 @@ class Lot(models.Model):
     source_url = models.TextField()
     title = models.TextField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
+    region_ref = models.ForeignKey(
+        Region,
+        models.DO_NOTHING,
+        db_column="region_id",
+        related_name="lots",
+        blank=True,
+        null=True,
+    )
+    municipality_ref = models.ForeignKey(
+        Municipality,
+        models.DO_NOTHING,
+        db_column="municipality_id",
+        related_name="lots",
+        blank=True,
+        null=True,
+    )
     region = models.TextField(blank=True, null=True)
+    region_name = models.TextField(blank=True, null=True)
+    source_torgi_region_code = models.TextField(blank=True, null=True)
+    subject_rf_code = models.TextField(blank=True, null=True)
     district = models.TextField(blank=True, null=True)
     address = models.TextField(blank=True, null=True)
     fias_guid = models.TextField(blank=True, null=True)
@@ -51,6 +108,7 @@ class Lot(models.Model):
     is_etp_empty = models.BooleanField(blank=True, null=True)
     score = models.IntegerField(blank=True, null=True)
     segment = models.TextField(blank=True, null=True)
+    municipality_name = models.TextField(blank=True, null=True)
     raw_data = models.JSONField()
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
@@ -61,6 +119,12 @@ class Lot(models.Model):
 
     def __str__(self) -> str:
         return self.title or f"Lot {self.id}"
+
+    @property
+    def region_display(self) -> str | None:
+        if self.region_ref_id and self.region_ref:
+            return self.region_ref.name
+        return self.region_name or self.region
 
 
 class UserLot(models.Model):

@@ -9,7 +9,9 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from land_monitor.models import Lot
+from land_monitor.services.municipalities import sync_lot_municipality_refs
 from land_monitor.services.lot_normalizer import normalize_lot
+from land_monitor.services.regions import sync_lot_region_refs
 
 
 def deduplicate_lots(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -105,6 +107,8 @@ def sync_lots(
     with db.begin():
         if deduped:
             upserted_ids = bulk_upsert_lots(db, deduped)
+            sync_lot_region_refs(db)
+            sync_lot_municipality_refs(db)
         if mark_missing_inactive:
             if not deduped:
                 deactivation_skipped = True

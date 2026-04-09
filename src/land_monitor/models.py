@@ -147,10 +147,50 @@ class Listing(Base):
     alerts: Mapped[list["Alert"]] = relationship(back_populates="listing")
 
 
+class Region(Base):
+    __tablename__ = "regions"
+    __table_args__ = (
+        Index("idx_regions_sort_order", "sort_order"),
+        Index("uq_regions_slug", "slug", unique=True),
+        Index("uq_regions_torgi_region_code", "torgi_region_code", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(100), nullable=False)
+    torgi_region_code: Mapped[int] = mapped_column(nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    sort_order: Mapped[int] = mapped_column(nullable=False, server_default=text("0"))
+
+    lots: Mapped[list["Lot"]] = relationship(back_populates="region_ref")
+
+
+class Municipality(Base):
+    __tablename__ = "municipalities"
+    __table_args__ = (
+        Index("idx_municipalities_region_sort_order", "region_id", "sort_order"),
+        Index("uq_municipalities_region_normalized_name", "region_id", "normalized_name", unique=True),
+        Index("uq_municipalities_region_slug", "region_id", "slug", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    region_id: Mapped[int] = mapped_column(ForeignKey("regions.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    sort_order: Mapped[int] = mapped_column(nullable=False, server_default=text("0"))
+
+    region: Mapped["Region"] = relationship()
+    lots: Mapped[list["Lot"]] = relationship(back_populates="municipality_ref")
+
+
 class Lot(Base):
     __tablename__ = "lots"
     __table_args__ = (
         Index("idx_lots_region", "region"),
+        Index("idx_lots_region_id", "region_id"),
+        Index("idx_lots_municipality_id", "municipality_id"),
         Index("idx_lots_notice_number", "notice_number"),
         Index("idx_lots_region_name", "region_name"),
         Index("idx_lots_price_min", "price_min"),
@@ -173,8 +213,13 @@ class Lot(Base):
     title: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
 
+    region_id: Mapped[int | None] = mapped_column(
+        ForeignKey("regions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     region: Mapped[str | None] = mapped_column(Text)
     region_name: Mapped[str | None] = mapped_column(Text)
+    source_torgi_region_code: Mapped[str | None] = mapped_column(Text)
     subject_rf_code: Mapped[str | None] = mapped_column(Text)
     district: Mapped[str | None] = mapped_column(Text)
     address: Mapped[str | None] = mapped_column(Text)
@@ -218,6 +263,10 @@ class Lot(Base):
     score: Mapped[int | None] = mapped_column()
     segment: Mapped[str | None] = mapped_column(Text)
     municipality_name: Mapped[str | None] = mapped_column(Text)
+    municipality_id: Mapped[int | None] = mapped_column(
+        ForeignKey("municipalities.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     settlement_name: Mapped[str | None] = mapped_column(Text)
     municipality_fias_guid: Mapped[str | None] = mapped_column(Text)
     settlement_fias_guid: Mapped[str | None] = mapped_column(Text)
@@ -234,6 +283,9 @@ class Lot(Base):
         nullable=False,
         server_default=text("NOW()"),
     )
+
+    region_ref: Mapped["Region | None"] = relationship(back_populates="lots")
+    municipality_ref: Mapped["Municipality | None"] = relationship(back_populates="lots")
 
 
 class Notice(Base):

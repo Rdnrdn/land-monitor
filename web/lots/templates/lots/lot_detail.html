@@ -1,4 +1,5 @@
 {% extends "lots/base.html" %}
+{% load lot_labels %}
 
 {% block title %}Лот {{ lot.id }} | Land Monitor{% endblock %}
 
@@ -20,37 +21,43 @@
         <h3 style="margin-top: 0;">Основные данные</h3>
         <dl class="kv">
             <dt>ID</dt><dd>{{ lot.id }}</dd>
-            <dt>Source</dt><dd>{{ lot.source|default:"—" }}</dd>
-            <dt>Source lot ID</dt><dd>{{ lot.source_lot_id|default:"—" }}</dd>
-            <dt>Region</dt><dd>{{ lot.region|default:"—" }}</dd>
-            <dt>District</dt><dd>{{ lot.district|default:"—" }}</dd>
-            <dt>Address</dt><dd>{{ lot.address|default:"—" }}</dd>
+            <dt>Источник</dt><dd>{{ lot.source|default:"—" }}</dd>
+            <dt>ID лота в источнике</dt><dd>{{ lot.source_lot_id|default:"—" }}</dd>
+            <dt>Регион</dt><dd>{{ lot.region_display|default:"—" }}</dd>
+            {% with municipality_name=lot.municipality_ref.name|default:lot.municipality_name %}
+                {% if municipality_name %}
+                    <dt>Муниципалитет</dt><dd>{{ municipality_name }}</dd>
+                {% endif %}
+            {% endwith %}
+            <dt>Код региона torgi.gov.ru</dt><dd>{% if lot.region_ref %}{{ lot.region_ref.torgi_region_code }}{% else %}{{ lot.subject_rf_code|default:"—" }}{% endif %}</dd>
+            <dt>Район</dt><dd>{{ lot.district|default:"—" }}</dd>
+            <dt>Адрес</dt><dd>{{ lot.address|default:"—" }}</dd>
             <dt>FIAS GUID</dt><dd>{{ lot.fias_guid|default:"—" }}</dd>
-            <dt>Cadastre number</dt><dd>{{ lot.cadastre_number|default:"—" }}</dd>
-            <dt>Area, m2</dt><dd>{{ lot.area_m2|default:"—" }}</dd>
-            <dt>Category</dt><dd>{{ lot.category|default:"—" }}</dd>
-            <dt>Permitted use</dt><dd>{{ lot.permitted_use|default:"—" }}</dd>
-            <dt>Price min</dt><dd>{{ lot.price_min|default:"—" }}</dd>
-            <dt>Price final</dt><dd>{{ lot.price_fin|default:"—" }}</dd>
-            <dt>Deposit amount</dt><dd>{{ lot.deposit_amount|default:"—" }}</dd>
-            <dt>Currency</dt><dd>{{ lot.currency_code|default:"—" }}</dd>
+            <dt>Кадастровый номер</dt><dd>{{ lot.cadastre_number|default:"—" }}</dd>
+            <dt>Площадь, м²</dt><dd>{{ lot.area_m2|default:"—" }}</dd>
+            <dt>Категория</dt><dd>{{ lot.category|default:"—" }}</dd>
+            <dt>Разрешённое использование</dt><dd>{{ lot.permitted_use|default:"—" }}</dd>
+            <dt>Начальная цена</dt><dd>{{ lot.price_min|default:"—" }}</dd>
+            <dt>Итоговая цена</dt><dd>{{ lot.price_fin|default:"—" }}</dd>
+            <dt>Размер задатка</dt><dd>{{ lot.deposit_amount|default:"—" }}</dd>
+            <dt>Валюта</dt><dd>{{ lot.currency_code|currency_label|default:"—" }}</dd>
             <dt>ETP</dt><dd>{{ lot.etp_name|default:lot.etp_code|default:"—" }}</dd>
-            <dt>Organizer</dt><dd>{{ lot.organizer_name|default:"—" }}</dd>
-            <dt>Organizer INN</dt><dd>{{ lot.organizer_inn|default:"—" }}</dd>
-            <dt>Organizer KPP</dt><dd>{{ lot.organizer_kpp|default:"—" }}</dd>
-            <dt>External status</dt><dd>{{ lot.lot_status_external|default:"—" }}</dd>
-            <dt>Is active</dt><dd>{{ lot.is_active|yesno:"Да,Нет,—" }}</dd>
-            <dt>Is finished</dt><dd>{{ lot.is_finished|yesno:"Да,Нет,—" }}</dd>
-            <dt>Application start</dt><dd>{{ lot.application_start_date|date:"d.m.Y H:i"|default:"—" }}</dd>
-            <dt>Application deadline</dt><dd>{{ lot.application_deadline|date:"d.m.Y H:i"|default:"—" }}</dd>
-            <dt>Auction date</dt><dd>{{ lot.auction_date|date:"d.m.Y H:i"|default:"—" }}</dd>
-            <dt>Source created</dt><dd>{{ lot.source_created_at|date:"d.m.Y H:i"|default:"—" }}</dd>
-            <dt>Source updated</dt><dd>{{ lot.source_updated_at|date:"d.m.Y H:i"|default:"—" }}</dd>
-            <dt>Price bucket</dt><dd>{{ lot.price_bucket|default:"—" }}</dd>
-            <dt>Days to deadline</dt><dd>{{ lot.days_to_deadline|default:"—" }}</dd>
+            <dt>Организатор</dt><dd>{{ lot.organizer_name|default:"—" }}</dd>
+            <dt>ИНН организатора</dt><dd>{{ lot.organizer_inn|default:"—" }}</dd>
+            <dt>КПП организатора</dt><dd>{{ lot.organizer_kpp|default:"—" }}</dd>
+            <dt>Статус лота</dt><dd>{{ lot.lot_status_external|lot_status_label|default:"—" }}</dd>
+            <dt>Активность</dt><dd>{{ lot.is_active|yesno:"Да,Нет,—" }}</dd>
+            <dt>Завершён</dt><dd>{{ lot.is_finished|yesno:"Да,Нет,—" }}</dd>
+            <dt>Начало приёма заявок</dt><dd>{{ lot.application_start_date|date:"d.m.Y H:i"|default:"—" }}</dd>
+            <dt>Окончание приёма заявок</dt><dd>{{ lot.application_deadline|date:"d.m.Y H:i"|default:"—" }}</dd>
+            <dt>Дата торгов</dt><dd>{{ lot.auction_date|date:"d.m.Y H:i"|default:"—" }}</dd>
+            <dt>Создано в источнике</dt><dd>{{ lot.source_created_at|date:"d.m.Y H:i"|default:"—" }}</dd>
+            <dt>Обновлено в источнике</dt><dd>{{ lot.source_updated_at|date:"d.m.Y H:i"|default:"—" }}</dd>
+            <dt>Ценовой диапазон</dt><dd>{{ lot.price_bucket|default:"—" }}</dd>
+            <dt>Дней до дедлайна</dt><dd>{{ lot.days_to_deadline|default:"—" }}</dd>
             <dt>Score</dt><dd>{{ lot.score|default:"—" }}</dd>
-            <dt>Segment</dt><dd>{{ lot.segment|default:"—" }}</dd>
-            <dt>Source URL</dt>
+            <dt>Сегмент</dt><dd>{{ lot.segment|default:"—" }}</dd>
+            <dt>Ссылка на источник</dt>
             <dd>
                 {% if lot.source_url %}
                     <a href="{{ lot.source_url }}" target="_blank" rel="noreferrer">Открыть источник</a>
@@ -58,23 +65,23 @@
                     —
                 {% endif %}
             </dd>
-            <dt>Description</dt><dd>{{ lot.description|default:"—" }}</dd>
+            <dt>Описание</dt><dd>{{ lot.description|default:"—" }}</dd>
         </dl>
     </div>
 </section>
 
 <section class="panel">
     <div class="panel__body">
-        <h3 style="margin-top: 0;">User state</h3>
+        <h3 style="margin-top: 0;">Пользовательский статус</h3>
         {% if user_lot %}
             <dl class="kv">
-                <dt>User status</dt><dd>{{ user_lot.user_status }}</dd>
-                <dt>Favorite</dt><dd>{% if user_lot.is_favorite %}Да{% else %}Нет{% endif %}</dd>
-                <dt>Needs inspection</dt><dd>{% if user_lot.needs_inspection %}Да{% else %}Нет{% endif %}</dd>
-                <dt>Needs legal check</dt><dd>{% if user_lot.needs_legal_check %}Да{% else %}Нет{% endif %}</dd>
-                <dt>Deposit paid</dt><dd>{% if user_lot.deposit_paid %}Да{% else %}Нет{% endif %}</dd>
-                <dt>Comment</dt><dd>{{ user_lot.comment|default:"—" }}</dd>
-                <dt>Updated</dt><dd>{{ user_lot.updated_at|date:"d.m.Y H:i"|default:"—" }}</dd>
+                <dt>Статус</dt><dd>{{ user_lot.user_status|user_status_label }}</dd>
+                <dt>Избранное</dt><dd>{% if user_lot.is_favorite %}Да{% else %}Нет{% endif %}</dd>
+                <dt>Нужен осмотр</dt><dd>{% if user_lot.needs_inspection %}Да{% else %}Нет{% endif %}</dd>
+                <dt>Нужна юр. проверка</dt><dd>{% if user_lot.needs_legal_check %}Да{% else %}Нет{% endif %}</dd>
+                <dt>Задаток оплачен</dt><dd>{% if user_lot.deposit_paid %}Да{% else %}Нет{% endif %}</dd>
+                <dt>Комментарий</dt><dd>{{ user_lot.comment|default:"—" }}</dd>
+                <dt>Обновлено</dt><dd>{{ user_lot.updated_at|date:"d.m.Y H:i"|default:"—" }}</dd>
             </dl>
         {% else %}
             <p class="muted">Пользовательское состояние для этого лота ещё не создано.</p>
@@ -93,12 +100,11 @@
                 {% csrf_token %}
                 <input type="hidden" name="action" value="set_status">
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                <select name="user_status">
+                <select name="user_status" aria-label="Статус" onchange="this.form.submit()">
                     {% for value, label in user_status_choices %}
-                        <option value="{{ value }}" {% if user_lot and user_lot.user_status == value %}selected{% endif %}>{{ label }}</option>
+                        <option value="{{ value }}" {% if user_lot and user_lot.user_status == value %}selected{% endif %}>{{ value|user_status_label }}</option>
                     {% endfor %}
                 </select>
-                <button type="submit">Сменить статус</button>
             </form>
             <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
                 {% csrf_token %}

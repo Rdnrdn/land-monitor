@@ -24,6 +24,23 @@ if [ ! -f "$ROOT_DIR/.env" ]; then
   exit 1
 fi
 
+if command -v pg_isready >/dev/null 2>&1; then
+  if ! (
+    set -a
+    source "$ROOT_DIR/.env"
+    set +a
+    pg_isready \
+      -h "${LAND_DB_HOST:-localhost}" \
+      -p "${LAND_DB_PORT:-5432}" \
+      -d "${LAND_DB_NAME:-land_monitor}" \
+      -U "${LAND_DB_USER:-land_user}"
+  ) >/dev/null 2>&1; then
+    echo "PostgreSQL is not reachable with the settings from $ROOT_DIR/.env"
+    echo "Check LAND_DB_* and make sure the local database is running."
+    exit 1
+  fi
+fi
+
 if [ -f "$PID_FILE" ]; then
   existing_pid="$(cat "$PID_FILE")"
   if kill -0 "$existing_pid" >/dev/null 2>&1; then
@@ -36,24 +53,41 @@ fi
 
 source "$VENV_DIR/bin/activate"
 
-(
-  cd "$ROOT_DIR/web"
-  nohup python manage.py runserver "$HOST:$PORT" >"$LOG_FILE" 2>&1 &
-  echo $! >"$PID_FILE"
-)
+# Keep local shell overrides from winning over repository .env.
+unset DATABASE_URL LAND_DB_URL LAND_DB_NAME LAND_DB_HOST LAND_DB_PORT LAND_DB_USER LAND_DB_PASSWORD
 
-sleep 2
+cd "$ROOT_DIR/web"
 
-server_pid="$(cat "$PID_FILE")"
-if ! kill -0 "$server_pid" >/dev/null 2>&1; then
-  echo "Django failed to start. Last log lines:"
-  tail -n 20 "$LOG_FILE" || true
-  rm -f "$PID_FILE"
-  exit 1
+if command -v setsid >/dev/null 2>&1; then
+  nohup setsid python manage.py runserver "$HOST:$PORT" --noreload \
+    >"$LOG_FILE" 2>&1 < /dev/null &
+else
+  nohup python manage.py runserver "$HOST:$PORT" --noreload \
+    >"$LOG_FILE" 2>&1 < /dev/null &
 fi
 
-echo "Local Django server started."
-echo "URL: http://$HOST:$PORT/"
-echo "PID: $server_pid"
-echo "Log: $LOG_FILE"
-echo "Stop: ./scripts/stop_local.sh"
+server_pid=$!
+disown "$server_pid" 2>/dev/null || true
+echo "$server_pid" >"$PID_FILE"
+
+for _ in $(seq 1 10); do
+  if ! kill -0 "$server_pid" >/dev/null 2>&1; then
+    break
+  fi
+
+  if curl -fsS "http://$HOST:$PORT/" >/dev/null 2>&1; then
+    echo "Local Django server started."
+    echo "URL: http://$HOST:$PORT/"
+    echo "PID: $server_pid"
+    echo "Log: $LOG_FILE"
+    echo "Stop: ./scripts/stop_local.sh"
+    exit 0
+  fi
+
+  sleep 1
+done
+
+echo "Django failed to start. Last log lines:"
+tail -n 40 "$LOG_FILE" || true
+rm -f "$PID_FILE"
+exit 1

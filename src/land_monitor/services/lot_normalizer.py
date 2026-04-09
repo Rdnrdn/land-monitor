@@ -70,7 +70,11 @@ def _price_bucket(price: Decimal | None) -> str | None:
     return "over_50m"
 
 
-def normalize_lot(raw: dict[str, Any], source: str = "torgi") -> dict[str, Any]:
+def normalize_lot(
+    raw: dict[str, Any],
+    source: str = "torgi",
+    source_torgi_region_code: str | None = None,
+) -> dict[str, Any]:
     source_lot_id = _pick_first(raw, ["id", "lotId", "lotNumber", "noticeNumber"])
     if not source_lot_id:
         raise ValueError("source_lot_id is required")
@@ -82,6 +86,7 @@ def normalize_lot(raw: dict[str, Any], source: str = "torgi") -> dict[str, Any]:
 
     title = _pick_first(raw, ["lotName", "name", "title"])
     description = _pick_first(raw, ["description", "lotDescription"])
+    region_name = _pick_first(raw, ["region", "regionName", "subjectRFName"])
 
     price_min = _to_decimal(_pick_first(raw, ["priceMin", "startPrice", "startPriceAmount"]))
     price_fin = _to_decimal(_pick_first(raw, ["priceFin", "finalPrice"]))
@@ -109,7 +114,10 @@ def normalize_lot(raw: dict[str, Any], source: str = "torgi") -> dict[str, Any]:
         "source_url": source_url,
         "title": title,
         "description": description,
-        "region": _pick_first(raw, ["region", "regionName", "subjectRFName"]),
+        "region": region_name,
+        "region_name": region_name,
+        "source_torgi_region_code": source_torgi_region_code,
+        "subject_rf_code": _pick_first(raw, ["subjectRFCode"]),
         "district": _pick_first(raw, ["district", "districtName", "municipalityName"]),
         "address": _pick_first(raw, ["address", "addressText"]),
         "fias_guid": _pick_first(raw, ["fiasGuid", "fiasGUID"]),

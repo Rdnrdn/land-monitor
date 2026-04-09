@@ -1,4 +1,5 @@
 import uuid
+from functools import cached_property
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -13,7 +14,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import DetailView, ListView
 
-from .models import Lot, UserLot, UserLotStatus
+from .models import Lot, Municipality, Region, UserLot, UserLotStatus
 
 
 ALLOWED_ORDERINGS = {
@@ -43,6 +44,9 @@ TAB_OPTIONS = (
 
 STATUS_CHOICES = tuple(UserLotStatus.choices)
 VALID_USER_STATUSES = {choice for choice, _ in STATUS_CHOICES}
+DEFAULT_PER_PAGE = 25
+PER_PAGE_OPTIONS = (25, 50, 100)
+MOSCOW_OBLAST_SLUG = "moskovskaya-oblast"
 
 
 def _clean_distinct_values(queryset, field_name: str) -> list[str]:
@@ -114,10 +118,18 @@ class LotListView(LoginRequiredMixin, ListView):
     model = Lot
     template_name = "lots/lot_list.html"
     context_object_name = "lots"
-    paginate_by = 50
+    paginate_by = DEFAULT_PER_PAGE
+
+    def get_paginate_by(self, queryset):
+        raw_per_page = self.request.GET.get("per_page")
+        try:
+            per_page = int(raw_per_page)
+        except (TypeError, ValueError):
+            return DEFAULT_PER_PAGE
+        return per_page if per_page in PER_PAGE_OPTIONS else DEFAULT_PER_PAGE
 
     def get_queryset(self):
-        queryset = Lot.objects.select_related("user_lot")
+        queryset = Lot.objects.select_related("user_lot", "region_ref", "municipality_ref")
 
         price_min = self.request.GET.get("price_min")
         if price_min:
@@ -131,9 +143,11 @@ class LotListView(LoginRequiredMixin, ListView):
         if status:
             queryset = queryset.filter(lot_status_external=status)
 
-        region = self.request.GET.get("region")
-        if region:
-            queryset = queryset.filter(region=region)
+        if self.selected_region is not None:
+            queryset = queryset.filter(region_ref=self.selected_region)
+
+        if self.show_municipality_filter and self.selected_municipalities:
+            queryset = queryset.filter(municipality_ref__in=self.selected_municipalities)
 
         is_active = self.request.GET.get("is_active")
         if is_active == "true":
@@ -161,9 +175,55 @@ class LotListView(LoginRequiredMixin, ListView):
         tab = self.request.GET.get("tab", "all")
         return tab if tab in dict(TAB_OPTIONS) else "all"
 
+    @cached_property
+    def selected_region(self) -> Region | None:
+        raw_region = self.request.GET.get("region")
+        if not raw_region:
+            return None
+        region_query = Q(slug=raw_region) | Q(name=raw_region)
+        if raw_region.isdigit():
+            region_query |= Q(torgi_region_code=int(raw_region))
+        return Region.objects.filter(region_query).order_by("sort_order", "name").first()
+
     def get_ordering_value(self) -> str:
         ordering = self.request.GET.get("ordering", "-updated_at")
         return ALLOWED_ORDERINGS.get(ordering, "-updated_at")
+
+    @cached_property
+    def show_municipality_filter(self) -> bool:
+        return bool(
+            self.selected_region is not None
+            and self.selected_region.slug == MOSCOW_OBLAST_SLUG
+        )
+
+    @cached_property
+    def selected_municipality_slugs(self) -> list[str]:
+        if not self.show_municipality_filter:
+            return []
+        return [value for value in self.request.GET.getlist("municipality") if value]
+
+    @cached_property
+    def municipality_options(self) -> list[Municipality]:
+        if not self.show_municipality_filter or self.selected_region is None:
+            return []
+        return list(
+            Municipality.objects.filter(
+                region=self.selected_region,
+                is_active=True,
+            ).order_by("sort_order", "name")
+        )
+
+    @cached_property
+    def selected_municipalities(self) -> list[Municipality]:
+        if not self.selected_municipality_slugs:
+            return []
+        return list(
+            Municipality.objects.filter(
+                region=self.selected_region,
+                slug__in=self.selected_municipality_slugs,
+                is_active=True,
+            )
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -175,6 +235,7 @@ class LotListView(LoginRequiredMixin, ListView):
         current_ordering = self.request.GET.get("ordering", "-updated_at")
         page_obj = context["page_obj"]
         paginator = page_obj.paginator
+        municipality_query_update = {} if self.show_municipality_filter else {"municipality": None}
         elided_pages = paginator.get_elided_page_range(
             number=page_obj.number,
             on_each_side=1,
@@ -186,7 +247,12 @@ class LotListView(LoginRequiredMixin, ListView):
                 "value": value,
                 "label": label,
                 "is_active": value == current_tab,
-                "querystring": _updated_querystring(self.request, tab=value, page=None),
+                "querystring": _updated_querystring(
+                    self.request,
+                    tab=value,
+                    page=None,
+                    **municipality_query_update,
+                ),
             }
             for value, label in TAB_OPTIONS
         ]
@@ -207,26 +273,48 @@ class LotListView(LoginRequiredMixin, ListView):
             context["current_ordering"],
             "Сначала новые",
         )
-        context["region_options"] = _clean_distinct_values(base_queryset, "region")
+        context["per_page_options"] = PER_PAGE_OPTIONS
+        context["current_per_page"] = self.get_paginate_by(self.object_list)
+        context["region_options"] = list(
+            Region.objects.filter(is_active=True).order_by("sort_order", "name")
+        )
+        context["selected_region"] = self.selected_region
+        context["show_municipality_filter"] = self.show_municipality_filter
+        context["municipality_options"] = self.municipality_options
+        context["selected_municipality_slugs"] = self.selected_municipality_slugs
         context["status_options"] = _clean_distinct_values(base_queryset, "lot_status_external")
-        context["page_querystring"] = _updated_querystring(self.request, page=None)
+        context["page_querystring"] = _updated_querystring(
+            self.request,
+            page=None,
+            **municipality_query_update,
+        )
         context["pagination_links"] = [
             {
                 "label": page,
                 "number": page if isinstance(page, int) else None,
                 "is_current": page == page_obj.number,
                 "is_ellipsis": page == paginator.ELLIPSIS,
-                "querystring": _updated_querystring(self.request, page=page)
+                "querystring": _updated_querystring(
+                    self.request,
+                    page=page,
+                    **municipality_query_update,
+                )
                 if isinstance(page, int)
                 else "",
             }
             for page in elided_pages
         ]
         context["user_status_choices"] = STATUS_CHOICES
-        active_filter_params = ("price_min", "price_max", "status", "region", "is_active")
+        active_filter_params = (
+            "price_min",
+            "price_max",
+            "status",
+            "region",
+            "is_active",
+        )
         context["active_filter_count"] = sum(
             1 for param in active_filter_params if self.request.GET.get(param)
-        ) + (1 if current_tab != "all" else 0)
+        ) + len(self.selected_municipality_slugs) + (1 if current_tab != "all" else 0)
         context["has_active_filters"] = context["active_filter_count"] > 0
         return context
 

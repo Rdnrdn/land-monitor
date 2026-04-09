@@ -172,6 +172,13 @@ class LotListView(ListView):
         base_queryset = Lot.objects.all()
         current_tab = self.get_current_tab()
         current_ordering = self.request.GET.get("ordering", "-updated_at")
+        page_obj = context["page_obj"]
+        paginator = page_obj.paginator
+        elided_pages = paginator.get_elided_page_range(
+            number=page_obj.number,
+            on_each_side=1,
+            on_ends=1,
+        )
 
         context["tab_options"] = [
             {
@@ -195,14 +202,31 @@ class LotListView(ListView):
         context["current_ordering"] = (
             current_ordering if current_ordering in ALLOWED_ORDERINGS else "-updated_at"
         )
+        context["current_ordering_label"] = dict(context["ordering_options"]).get(
+            context["current_ordering"],
+            "Сначала новые",
+        )
         context["region_options"] = _clean_distinct_values(base_queryset, "region")
         context["status_options"] = _clean_distinct_values(base_queryset, "lot_status_external")
         context["page_querystring"] = _updated_querystring(self.request, page=None)
+        context["pagination_links"] = [
+            {
+                "label": page,
+                "number": page if isinstance(page, int) else None,
+                "is_current": page == page_obj.number,
+                "is_ellipsis": page == paginator.ELLIPSIS,
+                "querystring": _updated_querystring(self.request, page=page)
+                if isinstance(page, int)
+                else "",
+            }
+            for page in elided_pages
+        ]
         context["user_status_choices"] = STATUS_CHOICES
-        context["has_active_filters"] = any(
-            self.request.GET.get(param)
-            for param in ("price_min", "price_max", "status", "region", "is_active")
-        ) or current_tab != "all"
+        active_filter_params = ("price_min", "price_max", "status", "region", "is_active")
+        context["active_filter_count"] = sum(
+            1 for param in active_filter_params if self.request.GET.get(param)
+        ) + (1 if current_tab != "all" else 0)
+        context["has_active_filters"] = context["active_filter_count"] > 0
         return context
 
 

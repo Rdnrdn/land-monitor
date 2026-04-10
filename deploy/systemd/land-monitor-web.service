@@ -1,0 +1,17 @@
+[Unit]
+Description=land-monitor Django web via Gunicorn
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/land-monitor/web
+EnvironmentFile=/etc/land-monitor/land-monitor.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/land-monitor/.venv/bin/gunicorn --bind 127.0.0.1:8000 --workers 3 --timeout 60 webapp.wsgi:application
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -38,6 +38,19 @@ HEADERS = {
 }
 
 
+def _derive_status_flags(status: str | None) -> tuple[bool | None, bool | None]:
+    if status is None:
+        return None, None
+    normalized = status.upper()
+    active_statuses = {"PUBLISHED", "APPLICATIONS_SUBMISSION"}
+    finished_statuses = {"FINISHED", "CANCELLED", "FAILED", "COMPLETED", "CLOSED"}
+    if normalized in active_statuses:
+        return True, False
+    if normalized in finished_statuses:
+        return False, True
+    return None, None
+
+
 def _parse_dt(value: Any) -> datetime | None:
     if not value:
         return None
@@ -255,9 +268,28 @@ def _build_payload(
     deposit_amount = _extract_number(_pick_first(raw, ["deposit", "depositAmount"]))
 
     application_end_at = _parse_dt(_pick_first(raw, ["biddEndTime", "applicationEndDate"]))
+    application_start_at = _parse_dt(
+        _pick_first(
+            raw,
+            [
+                "biddStartTime",
+                "applicationStartDate",
+                "noticeFirstVersionPublicationDate",
+                "firstVersionPublicationDate",
+            ],
+        )
+    )
     auction_start_at = _parse_dt(_pick_first(raw, ["auctionStartDate", "auctionDate"]))
+    source_created_at = _parse_dt(
+        _pick_first(
+            raw,
+            ["createDate", "createdAt", "noticeFirstVersionPublicationDate", "firstVersionPublicationDate"],
+        )
+    )
+    source_updated_at = _parse_dt(_pick_first(raw, ["updateDate", "updatedAt", "lastVersionPublicationDate"]))
 
     lot_status_external = _extract_text(_pick_first(raw, ["lotStatus"]))
+    is_active, is_finished = _derive_status_flags(lot_status_external)
 
     organizer_name = _extract_text(_pick_first(raw, ["organizerName"]))
     organizer_inn = _extract_text(_pick_first(raw, ["organizerInn"]))
@@ -285,6 +317,13 @@ def _build_payload(
         "currency_code": _extract_text(_pick_first(raw, ["currencyCode"])),
         "etp_code": etp_code,
         "is_without_etp": is_without_etp,
+        "application_start_date": application_start_at,
+        "application_deadline": application_end_at,
+        "auction_date": auction_start_at,
+        "source_created_at": source_created_at,
+        "source_updated_at": source_updated_at,
+        "is_active": is_active,
+        "is_finished": is_finished,
         "organizer_name": organizer_name,
         "organizer_inn": organizer_inn,
         "organizer_kpp": organizer_kpp,

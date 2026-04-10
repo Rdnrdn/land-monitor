@@ -3,6 +3,132 @@
 
 {% block title %}Лоты | Land Monitor{% endblock %}
 
+{% block extra_head %}
+<style>
+    .municipality-filter {
+        position: relative;
+    }
+    .municipality-filter__trigger {
+        width: 100%;
+        justify-content: space-between;
+        background: rgba(255, 255, 255, 0.88);
+        border-color: var(--border);
+        color: var(--text);
+        box-shadow: none;
+    }
+    .municipality-filter__trigger:hover {
+        background: var(--surface-strong);
+        box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+    }
+    .municipality-filter__trigger::after {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(45deg);
+        margin-left: auto;
+        opacity: 0.7;
+    }
+    .municipality-filter.is-open .municipality-filter__trigger {
+        border-color: var(--accent);
+        background: var(--surface-strong);
+    }
+    .municipality-filter__panel {
+        position: absolute;
+        top: calc(100% + 10px);
+        left: 0;
+        width: min(360px, 80vw);
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid var(--border-strong);
+        background: rgba(255, 255, 255, 0.98);
+        box-shadow: 0 22px 44px rgba(15, 23, 42, 0.16);
+        display: none;
+        z-index: 30;
+    }
+    .municipality-filter.is-open .municipality-filter__panel {
+        display: grid;
+        gap: 12px;
+    }
+    .municipality-filter__search {
+        min-height: 40px;
+    }
+    .municipality-filter__list {
+        max-height: 280px;
+        overflow-y: auto;
+        display: grid;
+        gap: 8px;
+        padding-right: 4px;
+    }
+    .municipality-filter__option {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: var(--surface-muted);
+        cursor: pointer;
+    }
+    .municipality-filter__option:hover {
+        border-color: var(--border-strong);
+        background: #f3f7fa;
+    }
+    .municipality-filter__option input {
+        width: 16px;
+        min-height: 16px;
+        margin: 2px 0 0;
+        padding: 0;
+        accent-color: var(--accent);
+        flex: 0 0 auto;
+    }
+    .municipality-filter__option-body {
+        min-width: 0;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+    }
+    .municipality-filter__label {
+        color: var(--text);
+        font-size: 0.95rem;
+        line-height: 1.35;
+    }
+    .municipality-filter__count {
+        color: var(--muted);
+        font-size: 0.84rem;
+        white-space: nowrap;
+    }
+    .municipality-filter__empty {
+        padding: 18px 12px;
+        border-radius: 14px;
+        border: 1px dashed var(--border);
+        color: var(--muted);
+        text-align: center;
+        background: rgba(248, 250, 252, 0.7);
+    }
+    .municipality-filter__actions {
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+    .municipality-filter__hidden {
+        display: none;
+    }
+    @media (max-width: 720px) {
+        .municipality-filter__panel {
+            width: min(100vw - 40px, 360px);
+        }
+        .municipality-filter__actions {
+            flex-direction: column-reverse;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <section class="panel">
     <div class="panel__body stack">
@@ -68,15 +194,62 @@
                     </select>
                 </div>
                 {% if show_municipality_filter %}
-                    <div class="field field--compact">
-                        <label for="id_municipality">Муниципалитет</label>
-                        <select id="id_municipality" name="municipality" multiple size="5" data-auto-submit>
+                    <div class="field field--compact municipality-filter" data-municipality-filter>
+                        <label for="municipality-trigger">Муниципалитет</label>
+                        <button
+                            id="municipality-trigger"
+                            type="button"
+                            class="button button--ghost municipality-filter__trigger"
+                            aria-haspopup="dialog"
+                            aria-expanded="false"
+                            data-municipality-trigger
+                        >
+                            Муниципалитет{% with selected_count=selected_municipality_slugs|length %}{% if selected_count %}: {{ selected_count }}{% endif %}{% endwith %}
+                        </button>
+                        <div class="municipality-filter__panel" data-municipality-panel>
+                            <input
+                                type="search"
+                                class="municipality-filter__search"
+                                placeholder="Поиск муниципалитета"
+                                autocomplete="off"
+                                data-municipality-search
+                            >
+                            <div class="municipality-filter__list" data-municipality-list>
+                                {% for municipality in municipality_options %}
+                                    <label
+                                        class="municipality-filter__option"
+                                        data-municipality-option
+                                        data-label="{{ municipality.label|lower }}"
+                                        data-value="{{ municipality.value }}"
+                                        data-count="{{ municipality.count }}"
+                                        data-selected="{% if municipality.selected %}true{% else %}false{% endif %}"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            value="{{ municipality.value }}"
+                                            {% if municipality.selected %}checked{% endif %}
+                                            data-municipality-checkbox
+                                        >
+                                        <span class="municipality-filter__option-body">
+                                            <span class="municipality-filter__label">{{ municipality.label }}</span>
+                                            <span class="municipality-filter__count">({{ municipality.count }})</span>
+                                        </span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                            <div class="municipality-filter__empty" data-municipality-empty hidden>Ничего не найдено</div>
+                            <div class="municipality-filter__actions">
+                                <button type="button" class="button button--ghost" data-municipality-reset>Сбросить</button>
+                                <button type="button" data-municipality-apply>Применить</button>
+                            </div>
+                        </div>
+                        <div class="municipality-filter__hidden" data-municipality-hidden>
                             {% for municipality in municipality_options %}
-                                <option value="{{ municipality.slug }}" {% if municipality.slug in selected_municipality_slugs %}selected{% endif %}>
-                                    {{ municipality.name }}
-                                </option>
+                                {% if municipality.selected %}
+                                    <input type="hidden" name="municipality" value="{{ municipality.value }}">
+                                {% endif %}
                             {% endfor %}
-                        </select>
+                        </div>
                     </div>
                 {% endif %}
                 <div class="field field--compact">
@@ -324,8 +497,8 @@
 
 {% block extra_scripts %}
 <script>
-    (function () {
-        const scrollStorageKey = "land-monitor:list-scroll:" + window.location.pathname + window.location.search;
+            (function () {
+                const scrollStorageKey = "land-monitor:list-scroll:" + window.location.pathname + window.location.search;
         const savedScrollY = window.sessionStorage.getItem(scrollStorageKey);
         if (savedScrollY !== null) {
             window.sessionStorage.removeItem(scrollStorageKey);
@@ -344,6 +517,21 @@
                 form.submit();
             };
 
+            const buildMunicipalityHiddenInputs = (values) => {
+                const container = form.querySelector("[data-municipality-hidden]");
+                if (!container) {
+                    return;
+                }
+                container.innerHTML = "";
+                values.forEach((value) => {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = "municipality";
+                    input.value = value;
+                    container.appendChild(input);
+                });
+            };
+
             form.querySelectorAll("[data-auto-submit]").forEach((element) => {
                 element.addEventListener("change", submit);
             });
@@ -355,6 +543,142 @@
                     timerId = window.setTimeout(submit, 350);
                 });
             });
+
+            const municipalityFilter = form.querySelector("[data-municipality-filter]");
+            if (municipalityFilter) {
+                const trigger = municipalityFilter.querySelector("[data-municipality-trigger]");
+                const panel = municipalityFilter.querySelector("[data-municipality-panel]");
+                const searchInput = municipalityFilter.querySelector("[data-municipality-search]");
+                const list = municipalityFilter.querySelector("[data-municipality-list]");
+                const emptyState = municipalityFilter.querySelector("[data-municipality-empty]");
+                const applyButton = municipalityFilter.querySelector("[data-municipality-apply]");
+                const resetButton = municipalityFilter.querySelector("[data-municipality-reset]");
+                const optionNodes = Array.from(municipalityFilter.querySelectorAll("[data-municipality-option]"));
+                const currentSelection = new Set(
+                    optionNodes
+                        .filter((option) => option.dataset.selected === "true")
+                        .map((option) => option.dataset.value)
+                );
+                let draftSelection = new Set(currentSelection);
+                let searchTimerId = null;
+
+                const updateTriggerLabel = (size) => {
+                    trigger.textContent = size ? `Муниципалитет: ${size}` : "Муниципалитет";
+                };
+
+                const sortOptions = () => {
+                    optionNodes.sort((left, right) => {
+                        const leftSelected = draftSelection.has(left.dataset.value) ? 1 : 0;
+                        const rightSelected = draftSelection.has(right.dataset.value) ? 1 : 0;
+                        if (leftSelected !== rightSelected) {
+                            return rightSelected - leftSelected;
+                        }
+                        return Number(right.dataset.count) - Number(left.dataset.count);
+                    });
+                    optionNodes.forEach((option) => list.appendChild(option));
+                };
+
+                const renderOptions = () => {
+                    const query = (searchInput.value || "").trim().toLowerCase();
+                    let visibleCount = 0;
+
+                    optionNodes.forEach((option) => {
+                        const checkbox = option.querySelector("[data-municipality-checkbox]");
+                        const isSelected = draftSelection.has(option.dataset.value);
+                        const matches = !query || option.dataset.label.includes(query);
+                        checkbox.checked = isSelected;
+                        option.dataset.selected = isSelected ? "true" : "false";
+
+                        const shouldShow = isSelected || matches;
+                        option.hidden = !shouldShow;
+                        if (shouldShow) {
+                            visibleCount += 1;
+                        }
+                    });
+
+                    emptyState.hidden = visibleCount !== 0;
+                    sortOptions();
+                };
+
+                const setOpen = (isOpen) => {
+                    municipalityFilter.classList.toggle("is-open", isOpen);
+                    trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
+                    if (isOpen) {
+                        searchInput.focus();
+                        renderOptions();
+                    }
+                };
+
+                trigger.addEventListener("click", () => {
+                    const nextState = !municipalityFilter.classList.contains("is-open");
+                    if (nextState) {
+                        draftSelection = new Set(currentSelection);
+                    }
+                    setOpen(nextState);
+                });
+
+                document.addEventListener("click", (event) => {
+                    if (!municipalityFilter.contains(event.target)) {
+                        draftSelection = new Set(currentSelection);
+                        renderOptions();
+                        setOpen(false);
+                    }
+                });
+
+                document.addEventListener("keydown", (event) => {
+                    if (event.key === "Escape" && municipalityFilter.classList.contains("is-open")) {
+                        draftSelection = new Set(currentSelection);
+                        renderOptions();
+                        setOpen(false);
+                    }
+                });
+
+                municipalityFilter.querySelectorAll("[data-municipality-checkbox]").forEach((checkbox) => {
+                    checkbox.addEventListener("change", () => {
+                        if (checkbox.checked) {
+                            draftSelection.add(checkbox.value);
+                        } else {
+                            draftSelection.delete(checkbox.value);
+                        }
+                        renderOptions();
+                    });
+                });
+
+                searchInput.addEventListener("input", () => {
+                    window.clearTimeout(searchTimerId);
+                    searchTimerId = window.setTimeout(renderOptions, 250);
+                });
+
+                applyButton.addEventListener("click", () => {
+                    currentSelection.clear();
+                    draftSelection.forEach((value) => currentSelection.add(value));
+                    buildMunicipalityHiddenInputs(Array.from(currentSelection));
+                    updateTriggerLabel(currentSelection.size);
+
+                    const pageInput = form.querySelector('input[name="page"]');
+                    if (pageInput) {
+                        pageInput.remove();
+                    }
+                    form.querySelectorAll('input[name="page"][type="hidden"]').forEach((input) => input.remove());
+
+                    setOpen(false);
+                    submit();
+                });
+
+                resetButton.addEventListener("click", () => {
+                    draftSelection.clear();
+                    currentSelection.clear();
+                    searchInput.value = "";
+                    buildMunicipalityHiddenInputs([]);
+                    updateTriggerLabel(0);
+                    renderOptions();
+                    setOpen(false);
+                    submit();
+                });
+
+                updateTriggerLabel(currentSelection.size);
+                renderOptions();
+            }
         }
 
         document.querySelectorAll("form[data-preserve-scroll]").forEach((quickActionForm) => {

@@ -20,53 +20,34 @@
     <div class="panel__body">
         <h3 style="margin-top: 0;">Основные данные</h3>
         <dl class="kv">
-            <dt>ID</dt><dd>{{ lot.id }}</dd>
-            <dt>Источник</dt><dd>{{ lot.source|default:"—" }}</dd>
-            <dt>ID лота в источнике</dt><dd>{{ lot.source_lot_id|default:"—" }}</dd>
-            <dt>Регион</dt><dd>{{ lot.region_display|default:"—" }}</dd>
-            {% with municipality_name=lot.municipality_ref.name|default:lot.municipality_name %}
-                {% if municipality_name %}
-                    <dt>Муниципалитет</dt><dd>{{ municipality_name }}</dd>
-                {% endif %}
-            {% endwith %}
-            <dt>Код региона torgi.gov.ru</dt><dd>{% if lot.region_ref %}{{ lot.region_ref.torgi_region_code }}{% else %}{{ lot.subject_rf_code|default:"—" }}{% endif %}</dd>
-            <dt>Район</dt><dd>{{ lot.district|default:"—" }}</dd>
-            <dt>Адрес</dt><dd>{{ lot.address|default:"—" }}</dd>
-            <dt>FIAS GUID</dt><dd>{{ lot.fias_guid|default:"—" }}</dd>
-            <dt>Кадастровый номер</dt><dd>{{ lot.cadastre_number|default:"—" }}</dd>
-            <dt>Площадь, м²</dt><dd>{{ lot.area_m2|default:"—" }}</dd>
-            <dt>Категория</dt><dd>{{ lot.category|default:"—" }}</dd>
-            <dt>Разрешённое использование</dt><dd>{{ lot.permitted_use|default:"—" }}</dd>
-            <dt>Начальная цена</dt><dd>{{ lot.price_min|default:"—" }}</dd>
-            <dt>Итоговая цена</dt><dd>{{ lot.price_fin|default:"—" }}</dd>
-            <dt>Размер задатка</dt><dd>{{ lot.deposit_amount|default:"—" }}</dd>
-            <dt>Валюта</dt><dd>{{ lot.currency_code|currency_label|default:"—" }}</dd>
-            <dt>ETP</dt><dd>{{ lot.etp_name|default:lot.etp_code|default:"—" }}</dd>
-            <dt>Организатор</dt><dd>{{ lot.organizer_name|default:"—" }}</dd>
-            <dt>ИНН организатора</dt><dd>{{ lot.organizer_inn|default:"—" }}</dd>
-            <dt>КПП организатора</dt><dd>{{ lot.organizer_kpp|default:"—" }}</dd>
-            <dt>Статус лота</dt><dd>{{ lot.lot_status_external|lot_status_label|default:"—" }}</dd>
-            <dt>Активность</dt><dd>{{ lot.is_active|yesno:"Да,Нет,—" }}</dd>
-            <dt>Завершён</dt><dd>{{ lot.is_finished|yesno:"Да,Нет,—" }}</dd>
-            <dt>Начало приёма заявок</dt><dd>{{ lot.application_start_date|date:"d.m.Y H:i"|default:"—" }}</dd>
-            <dt>Окончание приёма заявок</dt><dd>{{ lot.application_deadline|date:"d.m.Y H:i"|default:"—" }}</dd>
-            <dt>Дата торгов</dt><dd>{{ lot.auction_date|date:"d.m.Y H:i"|default:"—" }}</dd>
-            <dt>Создано в источнике</dt><dd>{{ lot.source_created_at|date:"d.m.Y H:i"|default:"—" }}</dd>
-            <dt>Обновлено в источнике</dt><dd>{{ lot.source_updated_at|date:"d.m.Y H:i"|default:"—" }}</dd>
-            <dt>Ценовой диапазон</dt><dd>{{ lot.price_bucket|default:"—" }}</dd>
-            <dt>Дней до дедлайна</dt><dd>{{ lot.days_to_deadline|default:"—" }}</dd>
-            <dt>Score</dt><dd>{{ lot.score|default:"—" }}</dd>
-            <dt>Сегмент</dt><dd>{{ lot.segment|default:"—" }}</dd>
-            <dt>Ссылка на источник</dt>
-            <dd>
-                {% if lot.source_url %}
+            {% for row in detail_rows %}
+                <dt>{{ row.label }}</dt>
+                <dd>
+                    {% if row.label == "Валюта" %}
+                        {{ row.value|currency_label|default:"—" }}
+                    {% elif row.label == "Статус лота" %}
+                        {{ row.value|lot_status_label|default:"—" }}
+                    {% else %}
+                        {{ row.value }}
+                    {% endif %}
+                </dd>
+            {% endfor %}
+            {% if lot.source_url %}
+                <dt>Ссылка на источник</dt>
+                <dd>
                     <a href="{{ lot.source_url }}" target="_blank" rel="noreferrer">Открыть источник</a>
-                {% else %}
-                    —
-                {% endif %}
-            </dd>
-            <dt>Описание</dt><dd>{{ lot.description|default:"—" }}</dd>
+                </dd>
+            {% endif %}
         </dl>
+
+        {% if detail_date_rows %}
+            <h3>Важные даты</h3>
+            <dl class="kv">
+                {% for row in detail_date_rows %}
+                    <dt>{{ row.label }}</dt><dd>{{ row.value|date:"d.m.Y H:i" }}</dd>
+                {% endfor %}
+            </dl>
+        {% endif %}
     </div>
 </section>
 

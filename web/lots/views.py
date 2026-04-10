@@ -1,4 +1,5 @@
 import uuid
+from collections import Counter
 from functools import cached_property
 
 from django.contrib import messages
@@ -14,7 +15,16 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import DetailView, ListView
 
-from .models import Lot, Municipality, Region, UserLot, UserLotStatus
+from .models import Lot, Region, UserLot, UserLotStatus
+from .safe_municipalities import (
+    MOSCOW_OBLAST_SLUG,
+    SafeMunicipalityOption,
+    get_safe_municipality_options_for_region_slug,
+    get_safe_municipality_label,
+    moscow_oblast_safe_option_map,
+    moscow_oblast_safe_normalized_alias_map,
+    moscow_oblast_safe_raw_alias_map,
+)
 
 
 ALLOWED_ORDERINGS = {
@@ -46,9 +56,6 @@ STATUS_CHOICES = tuple(UserLotStatus.choices)
 VALID_USER_STATUSES = {choice for choice, _ in STATUS_CHOICES}
 DEFAULT_PER_PAGE = 25
 PER_PAGE_OPTIONS = (25, 50, 100)
-MOSCOW_OBLAST_SLUG = "moskovskaya-oblast"
-
-
 def _clean_distinct_values(queryset, field_name: str) -> list[str]:
     return list(
         queryset.exclude(**{f"{field_name}__isnull": True})
@@ -114,6 +121,76 @@ def _get_or_create_user_lot(lot: Lot) -> tuple[UserLot, bool]:
         return UserLot.objects.get(lot=lot), False
 
 
+def _has_detail_value(value) -> bool:
+    return value is not None and value != ""
+
+
+def _build_lot_detail_rows(lot: Lot, *, canonical_municipality_label: str | None) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = [
+        {"label": "ID", "value": lot.id},
+        {"label": "Источник", "value": lot.source},
+        {"label": "ID лота в источнике", "value": lot.source_lot_id},
+    ]
+
+    if _has_detail_value(lot.region_display):
+        rows.append({"label": "Регион", "value": lot.region_display})
+
+    municipality_value = canonical_municipality_label or lot.municipality_name
+    if _has_detail_value(municipality_value):
+        rows.append({"label": "Муниципалитет", "value": municipality_value})
+
+    region_code = (
+        lot.region_ref.torgi_region_code
+        if lot.region_ref_id and lot.region_ref
+        else lot.subject_rf_code
+    )
+    if _has_detail_value(region_code):
+        rows.append({"label": "Код региона torgi.gov.ru", "value": region_code})
+
+    optional_rows = (
+        ("Район", lot.district),
+        ("Адрес", lot.address),
+        ("FIAS GUID", lot.fias_guid),
+        ("Кадастровый номер", lot.cadastre_number),
+        ("Площадь, м²", lot.area_m2),
+        ("Категория", lot.category),
+        ("Разрешённое использование", lot.permitted_use),
+        ("Начальная цена", lot.price_min),
+        ("Итоговая цена", lot.price_fin),
+        ("Размер задатка", lot.deposit_amount),
+        ("Валюта", lot.currency_code),
+        ("ETP", lot.etp_name or lot.etp_code),
+        ("Организатор", lot.organizer_name),
+        ("ИНН организатора", lot.organizer_inn),
+        ("КПП организатора", lot.organizer_kpp),
+        ("Статус лота", lot.lot_status_external),
+        ("Ценовой диапазон", lot.price_bucket),
+        ("Дней до дедлайна", lot.days_to_deadline),
+        ("Score", lot.score),
+        ("Сегмент", lot.segment),
+        ("Описание", lot.description),
+    )
+    for label, value in optional_rows:
+        if _has_detail_value(value):
+            rows.append({"label": label, "value": value})
+
+    return rows
+
+
+def _build_lot_detail_date_rows(lot: Lot) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for label, value in (
+        ("Начало приёма заявок", lot.application_start_date),
+        ("Окончание приёма заявок", lot.application_deadline),
+        ("Дата торгов", lot.auction_date),
+        ("Создано в источнике", lot.source_created_at),
+        ("Обновлено в источнике", lot.source_updated_at),
+    ):
+        if _has_detail_value(value):
+            rows.append({"label": label, "value": value})
+    return rows
+
+
 class LotListView(LoginRequiredMixin, ListView):
     model = Lot
     template_name = "lots/lot_list.html"
@@ -128,7 +205,7 @@ class LotListView(LoginRequiredMixin, ListView):
             return DEFAULT_PER_PAGE
         return per_page if per_page in PER_PAGE_OPTIONS else DEFAULT_PER_PAGE
 
-    def get_queryset(self):
+    def _build_queryset(self, *, apply_municipality_filter: bool) -> Lot.objects.none().__class__:
         queryset = Lot.objects.select_related("user_lot", "region_ref", "municipality_ref")
 
         price_min = self.request.GET.get("price_min")
@@ -146,8 +223,11 @@ class LotListView(LoginRequiredMixin, ListView):
         if self.selected_region is not None:
             queryset = queryset.filter(region_ref=self.selected_region)
 
-        if self.show_municipality_filter and self.selected_municipalities:
-            queryset = queryset.filter(municipality_ref__in=self.selected_municipalities)
+        if apply_municipality_filter and self.show_municipality_filter and self.selected_municipality_aliases:
+            queryset = queryset.filter(
+                Q(municipality_ref__normalized_name__in=self.selected_municipality_aliases)
+                | Q(municipality_name__in=self.selected_municipality_raw_aliases)
+            )
 
         is_active = self.request.GET.get("is_active")
         if is_active == "true":
@@ -169,7 +249,13 @@ class LotListView(LoginRequiredMixin, ListView):
                 Q(user_lot__user_status=UserLotStatus.ARCHIVE) | Q(is_active=False)
             )
 
-        return queryset.order_by(self.get_ordering_value(), "-id")
+        return queryset
+
+    def get_queryset(self):
+        return self._build_queryset(apply_municipality_filter=True).order_by(
+            self.get_ordering_value(),
+            "-id",
+        )
 
     def get_current_tab(self) -> str:
         tab = self.request.GET.get("tab", "all")
@@ -200,30 +286,75 @@ class LotListView(LoginRequiredMixin, ListView):
     def selected_municipality_slugs(self) -> list[str]:
         if not self.show_municipality_filter:
             return []
-        return [value for value in self.request.GET.getlist("municipality") if value]
+        option_map = moscow_oblast_safe_option_map()
+        values: list[str] = []
+        for value in self.request.GET.getlist("municipality"):
+            if not value or value not in option_map or value in values:
+                continue
+            values.append(value)
+        return values
 
     @cached_property
-    def municipality_options(self) -> list[Municipality]:
+    def municipality_options(self) -> list[SafeMunicipalityOption]:
         if not self.show_municipality_filter or self.selected_region is None:
             return []
-        return list(
-            Municipality.objects.filter(
-                region=self.selected_region,
-                is_active=True,
-            ).order_by("sort_order", "name")
-        )
+        return get_safe_municipality_options_for_region_slug(self.selected_region.slug)
 
     @cached_property
-    def selected_municipalities(self) -> list[Municipality]:
+    def selected_municipality_options(self) -> list[SafeMunicipalityOption]:
         if not self.selected_municipality_slugs:
             return []
-        return list(
-            Municipality.objects.filter(
-                region=self.selected_region,
-                slug__in=self.selected_municipality_slugs,
-                is_active=True,
-            )
+        option_map = moscow_oblast_safe_option_map()
+        return [
+            option_map[value]
+            for value in self.selected_municipality_slugs
+            if value in option_map
+        ]
+
+    @cached_property
+    def selected_municipality_aliases(self) -> list[str]:
+        aliases: list[str] = []
+        for option in self.selected_municipality_options:
+            aliases.extend(option.normalized_aliases)
+        return list(dict.fromkeys(aliases))
+
+    @cached_property
+    def selected_municipality_raw_aliases(self) -> list[str]:
+        aliases: list[str] = []
+        for option in self.selected_municipality_options:
+            aliases.extend(option.aliases)
+        return list(dict.fromkeys(aliases))
+
+    @cached_property
+    def municipality_option_counts(self) -> dict[str, int]:
+        if not self.show_municipality_filter:
+            return {}
+
+        normalized_alias_map = moscow_oblast_safe_normalized_alias_map()
+        raw_alias_map = moscow_oblast_safe_raw_alias_map()
+        counts: Counter[str] = Counter()
+
+        rows = self._build_queryset(apply_municipality_filter=False).values_list(
+            "municipality_ref__normalized_name",
+            "municipality_name",
         )
+        for normalized_name, raw_name in rows.iterator():
+            matched_values: set[str] = set()
+
+            if normalized_name:
+                safe_value = normalized_alias_map.get(normalized_name)
+                if safe_value:
+                    matched_values.add(safe_value)
+
+            if raw_name:
+                safe_value = raw_alias_map.get(raw_name)
+                if safe_value:
+                    matched_values.add(safe_value)
+
+            for safe_value in matched_values:
+                counts[safe_value] += 1
+
+        return dict(counts)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -280,8 +411,17 @@ class LotListView(LoginRequiredMixin, ListView):
         )
         context["selected_region"] = self.selected_region
         context["show_municipality_filter"] = self.show_municipality_filter
-        context["municipality_options"] = self.municipality_options
+        context["municipality_options"] = [
+            {
+                "label": option.label,
+                "value": option.value,
+                "count": self.municipality_option_counts.get(option.value, 0),
+                "selected": option.value in self.selected_municipality_slugs,
+            }
+            for option in self.municipality_options
+        ]
         context["selected_municipality_slugs"] = self.selected_municipality_slugs
+        context["selected_municipality_options"] = self.selected_municipality_options
         context["status_options"] = _clean_distinct_values(base_queryset, "lot_status_external")
         context["page_querystring"] = _updated_querystring(
             self.request,
@@ -323,12 +463,27 @@ class LotDetailView(LoginRequiredMixin, DetailView):
     model = Lot
     template_name = "lots/lot_detail.html"
     context_object_name = "lot"
-    queryset = Lot.objects.select_related("user_lot")
+    queryset = Lot.objects.select_related("user_lot", "region_ref", "municipality_ref")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["user_lot"] = _get_user_lot_state(self.object)
         context["user_status_choices"] = STATUS_CHOICES
+        canonical_municipality_label = get_safe_municipality_label(
+            region_slug=self.object.region_ref.slug if self.object.region_ref_id and self.object.region_ref else None,
+            normalized_name=(
+                self.object.municipality_ref.normalized_name
+                if self.object.municipality_ref_id and self.object.municipality_ref
+                else None
+            ),
+            raw_name=self.object.municipality_name,
+        )
+        context["canonical_municipality_label"] = canonical_municipality_label
+        context["detail_rows"] = _build_lot_detail_rows(
+            self.object,
+            canonical_municipality_label=canonical_municipality_label,
+        )
+        context["detail_date_rows"] = _build_lot_detail_date_rows(self.object)
         return context
 
 

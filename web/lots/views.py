@@ -1,11 +1,13 @@
+import json
 import uuid
 from collections import Counter
+from datetime import date, datetime
 from functools import cached_property
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
@@ -204,6 +206,120 @@ def _build_lot_detail_date_rows(lot: Lot) -> list[dict[str, object]]:
         if _has_detail_value(value):
             rows.append({"label": label, "value": value})
     return rows
+
+
+def _build_notice_row(label: str, value: object) -> dict[str, object] | None:
+    if not _has_detail_value(value):
+        return None
+    return {
+        "label": label,
+        "value": value,
+        "is_date": isinstance(value, (date, datetime)),
+        "is_url": isinstance(value, str) and value.startswith(("http://", "https://")),
+    }
+
+
+def _notice_attachments(raw_data: object) -> list[dict[str, object]]:
+    if isinstance(raw_data, str):
+        try:
+            raw_data = json.loads(raw_data)
+        except json.JSONDecodeError:
+            return []
+    if not isinstance(raw_data, dict):
+        return []
+    attachments = raw_data.get("attachments")
+    if not isinstance(attachments, list):
+        return []
+
+    documents: list[dict[str, object]] = []
+    for item in attachments:
+        if not isinstance(item, dict):
+            continue
+        title = item.get("fileName")
+        doc_type = item.get("attachmentTypeName")
+        size = item.get("fileSize")
+        uploaded_at = item.get("uploadDate")
+        if not any(_has_detail_value(value) for value in (title, doc_type, size, uploaded_at)):
+            continue
+        documents.append(
+            {
+                "title": title,
+                "type": doc_type,
+                "size": size,
+                "uploaded_at": uploaded_at,
+            }
+        )
+    return documents
+
+
+def _build_lot_notice_context(lot: Lot) -> dict[str, object]:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT
+                n.notice_number,
+                n.notice_status,
+                n.publish_date,
+                n.create_date,
+                n.update_date,
+                n.application_portal_url,
+                n.auction_site_url,
+                n.raw_data
+            FROM lots AS l
+            LEFT JOIN notices AS n ON n.notice_number = l.notice_number
+            WHERE l.id = %s
+            LIMIT 1
+            """,
+            [lot.pk],
+        )
+        row = cursor.fetchone()
+
+    if row is None:
+        return {
+            "notice_rows": [],
+            "notice_documents": [],
+            "notice_source_url": None,
+        }
+
+    (
+        notice_number,
+        notice_status,
+        publish_date,
+        create_date,
+        update_date,
+        application_portal_url,
+        auction_site_url,
+        raw_data,
+    ) = row
+
+    notice_rows = [
+        notice_row
+        for notice_row in (
+            _build_notice_row("Номер извещения", notice_number),
+            _build_notice_row("Статус извещения", notice_status),
+            _build_notice_row("Дата публикации", publish_date),
+            _build_notice_row("Дата создания", create_date),
+            _build_notice_row("Дата обновления", update_date),
+            _build_notice_row("Портал подачи заявки", application_portal_url),
+            _build_notice_row("Площадка торгов", auction_site_url),
+        )
+        if notice_row is not None
+    ]
+
+    notice_source_url = next(
+        (
+            value
+            for value in (application_portal_url, auction_site_url, lot.source_url)
+            if _has_detail_value(value)
+        ),
+        None,
+    )
+
+    return {
+        "notice_rows": notice_rows,
+        "notice_documents": _notice_attachments(raw_data),
+        "notice_source_url": notice_source_url,
+    }
 
 
 class LotListView(LoginRequiredMixin, ListView):
@@ -548,6 +664,7 @@ class LotDetailView(LoginRequiredMixin, DetailView):
             canonical_municipality_label=canonical_municipality_label,
         )
         context["detail_date_rows"] = _build_lot_detail_date_rows(self.object)
+        context.update(_build_lot_notice_context(self.object))
         return context
 
 

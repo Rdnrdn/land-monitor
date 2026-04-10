@@ -3,6 +3,38 @@
 
 {% block title %}Лот {{ lot.id }} | Land Monitor{% endblock %}
 
+{% block extra_head %}
+<style>
+    .notice-documents {
+        display: grid;
+        gap: 10px;
+    }
+    .notice-document {
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface-muted);
+    }
+    .notice-document[hidden] {
+        display: none;
+    }
+    .notice-document__title {
+        color: var(--text);
+        font-weight: 600;
+        line-height: 1.35;
+    }
+    .notice-document__meta {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.35;
+    }
+    .notice-documents__actions {
+        margin-top: 12px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <section class="panel">
     <div class="panel__body">
@@ -50,6 +82,76 @@
         {% endif %}
     </div>
 </section>
+
+{% if notice_rows %}
+    <section class="panel">
+        <div class="panel__body">
+            <h3 style="margin-top: 0;">Извещение</h3>
+            <dl class="kv">
+                {% for row in notice_rows %}
+                    {% if row.is_url %}
+                        {% if row.value != "https://torgi.gov.ru" and row.value != "https://torgi.gov.ru/" and row.value != "http://torgi.gov.ru" and row.value != "http://torgi.gov.ru/" and row.value != "https://www.torgi.gov.ru" and row.value != "https://www.torgi.gov.ru/" and row.value != "http://www.torgi.gov.ru" and row.value != "http://www.torgi.gov.ru/" %}
+                            <dt>{{ row.label }}</dt>
+                            <dd>
+                                <a href="{{ row.value }}" target="_blank" rel="noreferrer">{{ row.value }}</a>
+                            </dd>
+                        {% endif %}
+                    {% else %}
+                        <dt>{{ row.label }}</dt>
+                        <dd>
+                            {% if row.is_date %}
+                                {{ row.value|date:"d.m.Y H:i" }}
+                            {% else %}
+                                {{ row.value }}
+                            {% endif %}
+                        </dd>
+                    {% endif %}
+                {% endfor %}
+                {% if notice_source_url and notice_source_url != "https://torgi.gov.ru" and notice_source_url != "https://torgi.gov.ru/" and notice_source_url != "http://torgi.gov.ru" and notice_source_url != "http://torgi.gov.ru/" and notice_source_url != "https://www.torgi.gov.ru" and notice_source_url != "https://www.torgi.gov.ru/" and notice_source_url != "http://www.torgi.gov.ru" and notice_source_url != "http://www.torgi.gov.ru/" %}
+                    <dt>Оригинал</dt>
+                    <dd>
+                        <a href="{{ notice_source_url }}" target="_blank" rel="noreferrer">Открыть оригинальное извещение</a>
+                    </dd>
+                {% endif %}
+            </dl>
+        </div>
+    </section>
+{% endif %}
+
+{% if notice_documents %}
+    <section class="panel">
+        <div class="panel__body">
+            <h3 style="margin-top: 0;">Документы извещения</h3>
+            <div class="notice-documents" data-notice-documents>
+                {% for document in notice_documents %}
+                    <div class="notice-document" {% if forloop.counter > 10 %}hidden data-notice-document-extra{% endif %}>
+                        <div class="notice-document__title">
+                            {% if document.title and document.title != "None" %}
+                                {{ document.title }}
+                            {% else %}
+                                Без названия
+                            {% endif %}
+                        </div>
+                        {% if document.type and document.type != "None" and document.type != document.title or document.size and document.size != "0" or document.uploaded_at and document.uploaded_at != "None" %}
+                            <div class="notice-document__meta">
+                                {% if document.type and document.type != "None" and document.type != document.title %}<span>{{ document.type }}</span>{% endif %}
+                                {% if document.size and document.size != "0" %}{% if document.type and document.type != "None" and document.type != document.title %} · {% endif %}<span>{{ document.size|filesizeformat }}</span>{% endif %}
+                                {% if document.uploaded_at and document.uploaded_at != "None" %}{% if document.type and document.type != "None" and document.type != document.title or document.size and document.size != "0" %} · {% endif %}<span>{{ document.uploaded_at }}</span>{% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+            {% if notice_documents|length > 10 %}
+                <div class="notice-documents__actions">
+                    <button type="button" class="button button--ghost" data-notice-documents-toggle>
+                        Показать ещё
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+{% endif %}
 
 <section class="panel">
     <div class="panel__body">
@@ -115,4 +217,28 @@
         <p class="muted">Если user state ещё нет, он будет создан автоматически при первом действии.</p>
     </div>
 </section>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if notice_documents|length > 10 %}
+    <script>
+        (function () {
+            const toggleButton = document.querySelector("[data-notice-documents-toggle]");
+            if (!toggleButton) {
+                return;
+            }
+
+            const extraDocuments = Array.from(document.querySelectorAll("[data-notice-document-extra]"));
+            let isExpanded = false;
+
+            toggleButton.addEventListener("click", () => {
+                isExpanded = !isExpanded;
+                extraDocuments.forEach((documentItem) => {
+                    documentItem.hidden = !isExpanded;
+                });
+                toggleButton.textContent = isExpanded ? "Скрыть" : "Показать ещё";
+            });
+        })();
+    </script>
+{% endif %}
 {% endblock %}

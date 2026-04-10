@@ -13,15 +13,25 @@
     }
     .municipality-filter__trigger {
         width: 100%;
+        min-height: 42px;
+        padding: 0 12px;
         justify-content: space-between;
+        align-items: center;
         background: rgba(255, 255, 255, 0.88);
         border-color: var(--border);
         color: var(--text);
         box-shadow: none;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: normal;
+        text-align: left;
+        transform: none;
     }
     .municipality-filter__trigger:hover {
         background: var(--surface-strong);
-        box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+        box-shadow: none;
+        transform: none;
     }
     .municipality-filter__trigger::after {
         content: "";
@@ -56,6 +66,7 @@
     }
     .municipality-filter__search {
         min-height: 40px;
+        font-size: 0.95rem;
     }
     .municipality-filter__list {
         max-height: 280px;
@@ -222,7 +233,7 @@
                                     <label
                                         class="municipality-filter__option"
                                         data-municipality-option
-                                        data-label="{{ municipality.label|lower }}"
+                                        data-label="{{ municipality.label }}"
                                         data-value="{{ municipality.value }}"
                                         data-count="{{ municipality.count }}"
                                         data-selected="{% if municipality.selected %}true{% else %}false{% endif %}"
@@ -279,7 +290,7 @@
                                 <label
                                     class="municipality-filter__option"
                                     data-popup-option
-                                    data-label="{{ option.label|lower }}"
+                                    data-label="{{ option.label }}"
                                     data-value="{{ option.value }}"
                                     data-count="{{ option.count }}"
                                     data-selected="{% if option.selected %}true{% else %}false{% endif %}"
@@ -644,25 +655,38 @@
                 };
 
                 const sortOptions = () => {
+                    const query = searchInput ? (searchInput.value || "").trim().toLocaleLowerCase("ru-RU") : "";
                     optionNodes.sort((left, right) => {
+                        const leftLabel = (left.dataset.label || "").toLocaleLowerCase("ru-RU");
+                        const rightLabel = (right.dataset.label || "").toLocaleLowerCase("ru-RU");
+                        const leftMatches = query && leftLabel.includes(query) ? 1 : 0;
+                        const rightMatches = query && rightLabel.includes(query) ? 1 : 0;
                         const leftSelected = draftSelection.has(left.dataset.value) ? 1 : 0;
                         const rightSelected = draftSelection.has(right.dataset.value) ? 1 : 0;
                         if (leftSelected !== rightSelected) {
                             return rightSelected - leftSelected;
                         }
-                        return Number(right.dataset.count) - Number(left.dataset.count);
+                        if (leftMatches !== rightMatches) {
+                            return rightMatches - leftMatches;
+                        }
+                        const byCount = Number(right.dataset.count) - Number(left.dataset.count);
+                        if (byCount !== 0) {
+                            return byCount;
+                        }
+                        return leftLabel.localeCompare(rightLabel, "ru");
                     });
                     optionNodes.forEach((option) => list.appendChild(option));
                 };
 
                 const renderOptions = () => {
-                    const query = searchInput ? (searchInput.value || "").trim().toLowerCase() : "";
+                    const query = searchInput ? (searchInput.value || "").trim().toLocaleLowerCase("ru-RU") : "";
                     let visibleCount = 0;
 
                     optionNodes.forEach((option) => {
                         const checkbox = option.querySelector("[data-popup-checkbox], [data-municipality-checkbox]");
                         const isSelected = draftSelection.has(option.dataset.value);
-                        const matches = !query || option.dataset.label.includes(query);
+                        const label = (option.dataset.label || "").toLocaleLowerCase("ru-RU");
+                        const matches = !query || label.includes(query);
                         checkbox.checked = isSelected;
                         option.dataset.selected = isSelected ? "true" : "false";
 

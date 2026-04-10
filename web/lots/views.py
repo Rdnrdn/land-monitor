@@ -56,6 +56,12 @@ STATUS_CHOICES = tuple(UserLotStatus.choices)
 VALID_USER_STATUSES = {choice for choice, _ in STATUS_CHOICES}
 DEFAULT_PER_PAGE = 25
 PER_PAGE_OPTIONS = (25, 50, 100)
+DEAL_TYPE_LABELS = {
+    "sale": "Продажа",
+    "rent": "Аренда",
+}
+
+
 def _clean_distinct_values(queryset, field_name: str) -> list[str]:
     return list(
         queryset.exclude(**{f"{field_name}__isnull": True})
@@ -125,6 +131,14 @@ def _has_detail_value(value) -> bool:
     return value is not None and value != ""
 
 
+def _get_lot_deal_type(lot: Lot) -> str | None:
+    raw_data = lot.raw_data if isinstance(lot.raw_data, dict) else {}
+    deal_type = raw_data.get("typeTransaction")
+    if deal_type in DEAL_TYPE_LABELS:
+        return DEAL_TYPE_LABELS[deal_type]
+    return deal_type
+
+
 def _build_lot_detail_rows(lot: Lot, *, canonical_municipality_label: str | None) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = [
         {"label": "ID", "value": lot.id},
@@ -154,6 +168,7 @@ def _build_lot_detail_rows(lot: Lot, *, canonical_municipality_label: str | None
         ("Кадастровый номер", lot.cadastre_number),
         ("Площадь, м²", lot.area_m2),
         ("Категория", lot.category),
+        ("Тип сделки", _get_lot_deal_type(lot)),
         ("Разрешённое использование", lot.permitted_use),
         ("Начальная цена", lot.price_min),
         ("Итоговая цена", lot.price_fin),
@@ -205,7 +220,12 @@ class LotListView(LoginRequiredMixin, ListView):
             return DEFAULT_PER_PAGE
         return per_page if per_page in PER_PAGE_OPTIONS else DEFAULT_PER_PAGE
 
-    def _build_queryset(self, *, apply_municipality_filter: bool) -> Lot.objects.none().__class__:
+    def _build_queryset(
+        self,
+        *,
+        apply_municipality_filter: bool,
+        apply_deal_type_filter: bool,
+    ) -> Lot.objects.none().__class__:
         queryset = Lot.objects.select_related("user_lot", "region_ref", "municipality_ref")
 
         price_min = self.request.GET.get("price_min")
@@ -228,6 +248,9 @@ class LotListView(LoginRequiredMixin, ListView):
                 Q(municipality_ref__normalized_name__in=self.selected_municipality_aliases)
                 | Q(municipality_name__in=self.selected_municipality_raw_aliases)
             )
+
+        if apply_deal_type_filter and self.is_deal_type_filter_active:
+            queryset = queryset.filter(raw_data__typeTransaction__in=self.selected_deal_types)
 
         is_active = self.request.GET.get("is_active")
         if is_active == "true":
@@ -252,7 +275,10 @@ class LotListView(LoginRequiredMixin, ListView):
         return queryset
 
     def get_queryset(self):
-        return self._build_queryset(apply_municipality_filter=True).order_by(
+        return self._build_queryset(
+            apply_municipality_filter=True,
+            apply_deal_type_filter=True,
+        ).order_by(
             self.get_ordering_value(),
             "-id",
         )
@@ -326,6 +352,19 @@ class LotListView(LoginRequiredMixin, ListView):
         return list(dict.fromkeys(aliases))
 
     @cached_property
+    def selected_deal_types(self) -> list[str]:
+        values: list[str] = []
+        for value in self.request.GET.getlist("deal_type"):
+            if value not in DEAL_TYPE_LABELS or value in values:
+                continue
+            values.append(value)
+        return values or list(DEAL_TYPE_LABELS.keys())
+
+    @cached_property
+    def is_deal_type_filter_active(self) -> bool:
+        return set(self.selected_deal_types) != set(DEAL_TYPE_LABELS.keys())
+
+    @cached_property
     def municipality_option_counts(self) -> dict[str, int]:
         if not self.show_municipality_filter:
             return {}
@@ -334,7 +373,10 @@ class LotListView(LoginRequiredMixin, ListView):
         raw_alias_map = moscow_oblast_safe_raw_alias_map()
         counts: Counter[str] = Counter()
 
-        rows = self._build_queryset(apply_municipality_filter=False).values_list(
+        rows = self._build_queryset(
+            apply_municipality_filter=False,
+            apply_deal_type_filter=True,
+        ).values_list(
             "municipality_ref__normalized_name",
             "municipality_name",
         )
@@ -354,6 +396,18 @@ class LotListView(LoginRequiredMixin, ListView):
             for safe_value in matched_values:
                 counts[safe_value] += 1
 
+        return dict(counts)
+
+    @cached_property
+    def deal_type_option_counts(self) -> dict[str, int]:
+        counts: Counter[str] = Counter()
+        rows = self._build_queryset(
+            apply_municipality_filter=True,
+            apply_deal_type_filter=False,
+        ).values_list("raw_data__typeTransaction", flat=True)
+        for deal_type in rows.iterator():
+            if deal_type in DEAL_TYPE_LABELS:
+                counts[deal_type] += 1
         return dict(counts)
 
     def get_context_data(self, **kwargs):
@@ -422,6 +476,16 @@ class LotListView(LoginRequiredMixin, ListView):
         ]
         context["selected_municipality_slugs"] = self.selected_municipality_slugs
         context["selected_municipality_options"] = self.selected_municipality_options
+        context["deal_type_options"] = [
+            {
+                "label": label,
+                "value": value,
+                "count": self.deal_type_option_counts.get(value, 0),
+                "selected": value in self.selected_deal_types,
+            }
+            for value, label in DEAL_TYPE_LABELS.items()
+        ]
+        context["selected_deal_types"] = self.selected_deal_types
         context["status_options"] = _clean_distinct_values(base_queryset, "lot_status_external")
         context["page_querystring"] = _updated_querystring(
             self.request,
@@ -454,7 +518,7 @@ class LotListView(LoginRequiredMixin, ListView):
         )
         context["active_filter_count"] = sum(
             1 for param in active_filter_params if self.request.GET.get(param)
-        ) + len(self.selected_municipality_slugs) + (1 if current_tab != "all" else 0)
+        ) + len(self.selected_municipality_slugs) + (1 if self.is_deal_type_filter_active else 0) + (1 if current_tab != "all" else 0)
         context["has_active_filters"] = context["active_filter_count"] > 0
         return context
 

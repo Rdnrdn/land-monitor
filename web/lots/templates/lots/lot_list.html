@@ -8,6 +8,9 @@
     .municipality-filter {
         position: relative;
     }
+    .municipality-filter--compact .municipality-filter__panel {
+        width: min(300px, 72vw);
+    }
     .municipality-filter__trigger {
         width: 100%;
         justify-content: space-between;
@@ -252,6 +255,65 @@
                         </div>
                     </div>
                 {% endif %}
+                <div class="field field--compact municipality-filter municipality-filter--compact" data-popup-filter data-popup-filter-name="deal_type">
+                    <label for="deal-type-trigger">Тип сделки</label>
+                    <button
+                        id="deal-type-trigger"
+                        type="button"
+                        class="button button--ghost municipality-filter__trigger"
+                        aria-haspopup="dialog"
+                        aria-expanded="false"
+                        data-popup-trigger
+                    >
+                        {% with selected_count=selected_deal_types|length total_count=deal_type_options|length %}
+                            {% if selected_count and selected_count < total_count %}
+                                Тип сделки: {{ selected_count }}
+                            {% else %}
+                                Тип сделки
+                            {% endif %}
+                        {% endwith %}
+                    </button>
+                    <div class="municipality-filter__panel" data-popup-panel>
+                        <div class="municipality-filter__list" data-popup-list>
+                            {% for option in deal_type_options %}
+                                <label
+                                    class="municipality-filter__option"
+                                    data-popup-option
+                                    data-label="{{ option.label|lower }}"
+                                    data-value="{{ option.value }}"
+                                    data-count="{{ option.count }}"
+                                    data-selected="{% if option.selected %}true{% else %}false{% endif %}"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        value="{{ option.value }}"
+                                        {% if option.selected %}checked{% endif %}
+                                        data-popup-checkbox
+                                    >
+                                    <span class="municipality-filter__option-body">
+                                        <span class="municipality-filter__label">{{ option.label }}</span>
+                                        <span class="municipality-filter__count">({{ option.count }})</span>
+                                    </span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                        <div class="municipality-filter__actions">
+                            <button type="button" class="button button--ghost" data-popup-reset>Сбросить</button>
+                            <button type="button" data-popup-apply>Применить</button>
+                        </div>
+                    </div>
+                    <div class="municipality-filter__hidden" data-popup-hidden>
+                        {% with selected_count=selected_deal_types|length total_count=deal_type_options|length %}
+                            {% if selected_count and selected_count < total_count %}
+                                {% for option in deal_type_options %}
+                                    {% if option.selected %}
+                                        <input type="hidden" name="deal_type" value="{{ option.value }}">
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
                 <div class="field field--compact">
                     <label for="id_status">Статус лота</label>
                     <select id="id_status" name="status" data-auto-submit>
@@ -259,14 +321,6 @@
                         {% for value in status_options %}
                             <option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ value }}</option>
                         {% endfor %}
-                    </select>
-                </div>
-                <div class="field field--compact">
-                    <label for="id_is_active">Активность</label>
-                    <select id="id_is_active" name="is_active" data-auto-submit>
-                        <option value="">Любая</option>
-                        <option value="true" {% if request.GET.is_active == "true" %}selected{% endif %}>Только активные</option>
-                        <option value="false" {% if request.GET.is_active == "false" %}selected{% endif %}>Только неактивные</option>
                     </select>
                 </div>
                 <div class="field field--compact">
@@ -292,6 +346,9 @@
                     {% if selected_region %}<span class="badge">{{ selected_region.name }}</span>{% elif request.GET.region %}<span class="badge">{{ request.GET.region }}</span>{% endif %}
                     {% if show_municipality_filter and selected_municipality_slugs|length %}
                         <span class="badge">Муниципалитеты: {{ selected_municipality_slugs|length }}</span>
+                    {% endif %}
+                    {% if selected_deal_types|length and selected_deal_types|length < deal_type_options|length %}
+                        <span class="badge">Тип сделки: {{ selected_deal_types|length }}</span>
                     {% endif %}
                     {% if request.GET.status %}<span class="badge">{{ request.GET.status }}</span>{% endif %}
                     {% if request.GET.price_min or request.GET.price_max %}<span class="badge">Цена</span>{% endif %}
@@ -328,13 +385,6 @@
                             <div>
                                 <div class="toolbar__meta">
                                     <span class="badge">ID {{ lot.id }}</span>
-                                    {% if lot.is_active %}
-                                        <span class="status-pill status-pill--active">Активен</span>
-                                    {% elif lot.is_active == False %}
-                                        <span class="status-pill status-pill--inactive">Неактивен</span>
-                                    {% else %}
-                                        <span class="status-pill status-pill--neutral">Активность не указана</span>
-                                    {% endif %}
                                     {% if lot.user_lot_state and lot.user_lot_state.is_favorite %}
                                         <span class="badge badge--accent">Избранное</span>
                                     {% endif %}
@@ -379,6 +429,10 @@
                             <div class="meta-tile">
                                 <div class="meta-tile__label">Статус</div>
                                 <div class="meta-tile__value">{{ lot.lot_status_external|lot_status_label|default:"—" }}</div>
+                            </div>
+                            <div class="meta-tile">
+                                <div class="meta-tile__label">Тип сделки</div>
+                                <div class="meta-tile__value">{{ lot.raw_data.typeTransaction|deal_type_label|default:"—" }}</div>
                             </div>
                             <div class="meta-tile">
                                 <div class="meta-tile__label">Тип</div>
@@ -497,8 +551,8 @@
 
 {% block extra_scripts %}
 <script>
-            (function () {
-                const scrollStorageKey = "land-monitor:list-scroll:" + window.location.pathname + window.location.search;
+    (function () {
+        const scrollStorageKey = "land-monitor:list-scroll:" + window.location.pathname + window.location.search;
         const savedScrollY = window.sessionStorage.getItem(scrollStorageKey);
         if (savedScrollY !== null) {
             window.sessionStorage.removeItem(scrollStorageKey);
@@ -517,8 +571,7 @@
                 form.submit();
             };
 
-            const buildMunicipalityHiddenInputs = (values) => {
-                const container = form.querySelector("[data-municipality-hidden]");
+            const buildHiddenInputs = (container, name, values) => {
                 if (!container) {
                     return;
                 }
@@ -526,10 +579,18 @@
                 values.forEach((value) => {
                     const input = document.createElement("input");
                     input.type = "hidden";
-                    input.name = "municipality";
+                    input.name = name;
                     input.value = value;
                     container.appendChild(input);
                 });
+            };
+
+            const clearPageInputs = () => {
+                const pageInput = form.querySelector('input[name="page"]');
+                if (pageInput) {
+                    pageInput.remove();
+                }
+                form.querySelectorAll('input[name="page"][type="hidden"]').forEach((input) => input.remove());
             };
 
             form.querySelectorAll("[data-auto-submit]").forEach((element) => {
@@ -544,26 +605,42 @@
                 });
             });
 
-            const municipalityFilter = form.querySelector("[data-municipality-filter]");
-            if (municipalityFilter) {
-                const trigger = municipalityFilter.querySelector("[data-municipality-trigger]");
-                const panel = municipalityFilter.querySelector("[data-municipality-panel]");
-                const searchInput = municipalityFilter.querySelector("[data-municipality-search]");
-                const list = municipalityFilter.querySelector("[data-municipality-list]");
-                const emptyState = municipalityFilter.querySelector("[data-municipality-empty]");
-                const applyButton = municipalityFilter.querySelector("[data-municipality-apply]");
-                const resetButton = municipalityFilter.querySelector("[data-municipality-reset]");
-                const optionNodes = Array.from(municipalityFilter.querySelectorAll("[data-municipality-option]"));
-                const currentSelection = new Set(
-                    optionNodes
-                        .filter((option) => option.dataset.selected === "true")
-                        .map((option) => option.dataset.value)
-                );
-                let draftSelection = new Set(currentSelection);
+            const setupPopupFilter = (root, config) => {
+                if (!root) {
+                    return;
+                }
+
+                const trigger = root.querySelector("[data-popup-trigger], [data-municipality-trigger]");
+                const panel = root.querySelector("[data-popup-panel], [data-municipality-panel]");
+                const searchInput = root.querySelector("[data-popup-search], [data-municipality-search]");
+                const list = root.querySelector("[data-popup-list], [data-municipality-list]");
+                const emptyState = root.querySelector("[data-popup-empty], [data-municipality-empty]");
+                const applyButton = root.querySelector("[data-popup-apply], [data-municipality-apply]");
+                const resetButton = root.querySelector("[data-popup-reset], [data-municipality-reset]");
+                const hiddenContainer = root.querySelector("[data-popup-hidden], [data-municipality-hidden]");
+                const optionNodes = Array.from(root.querySelectorAll("[data-popup-option], [data-municipality-option]"));
+                const allValues = optionNodes.map((option) => option.dataset.value);
+                const initialSelection = optionNodes
+                    .filter((option) => option.dataset.selected === "true")
+                    .map((option) => option.dataset.value);
+                const currentSelection = new Set(initialSelection);
+                let draftSelection = new Set(initialSelection);
                 let searchTimerId = null;
 
-                const updateTriggerLabel = (size) => {
-                    trigger.textContent = size ? `Муниципалитет: ${size}` : "Муниципалитет";
+                const normalizedSelection = (selection) => {
+                    if (config.emptyMeansAll && selection.size === 0) {
+                        return new Set(allValues);
+                    }
+                    return new Set(selection);
+                };
+
+                const shouldOmitFromUrl = (selection) => {
+                    return config.omitWhenAllSelected && selection.size === allValues.length;
+                };
+
+                const updateTriggerLabel = (selection) => {
+                    const size = selection.size;
+                    trigger.textContent = config.getLabel(size, allValues.length);
                 };
 
                 const sortOptions = () => {
@@ -579,11 +656,11 @@
                 };
 
                 const renderOptions = () => {
-                    const query = (searchInput.value || "").trim().toLowerCase();
+                    const query = searchInput ? (searchInput.value || "").trim().toLowerCase() : "";
                     let visibleCount = 0;
 
                     optionNodes.forEach((option) => {
-                        const checkbox = option.querySelector("[data-municipality-checkbox]");
+                        const checkbox = option.querySelector("[data-popup-checkbox], [data-municipality-checkbox]");
                         const isSelected = draftSelection.has(option.dataset.value);
                         const matches = !query || option.dataset.label.includes(query);
                         checkbox.checked = isSelected;
@@ -596,21 +673,25 @@
                         }
                     });
 
-                    emptyState.hidden = visibleCount !== 0;
+                    if (emptyState) {
+                        emptyState.hidden = visibleCount !== 0;
+                    }
                     sortOptions();
                 };
 
                 const setOpen = (isOpen) => {
-                    municipalityFilter.classList.toggle("is-open", isOpen);
+                    root.classList.toggle("is-open", isOpen);
                     trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
                     if (isOpen) {
-                        searchInput.focus();
+                        if (searchInput) {
+                            searchInput.focus();
+                        }
                         renderOptions();
                     }
                 };
 
                 trigger.addEventListener("click", () => {
-                    const nextState = !municipalityFilter.classList.contains("is-open");
+                    const nextState = !root.classList.contains("is-open");
                     if (nextState) {
                         draftSelection = new Set(currentSelection);
                     }
@@ -618,7 +699,7 @@
                 });
 
                 document.addEventListener("click", (event) => {
-                    if (!municipalityFilter.contains(event.target)) {
+                    if (!root.contains(event.target)) {
                         draftSelection = new Set(currentSelection);
                         renderOptions();
                         setOpen(false);
@@ -626,14 +707,14 @@
                 });
 
                 document.addEventListener("keydown", (event) => {
-                    if (event.key === "Escape" && municipalityFilter.classList.contains("is-open")) {
+                    if (event.key === "Escape" && root.classList.contains("is-open")) {
                         draftSelection = new Set(currentSelection);
                         renderOptions();
                         setOpen(false);
                     }
                 });
 
-                municipalityFilter.querySelectorAll("[data-municipality-checkbox]").forEach((checkbox) => {
+                root.querySelectorAll("[data-popup-checkbox], [data-municipality-checkbox]").forEach((checkbox) => {
                     checkbox.addEventListener("change", () => {
                         if (checkbox.checked) {
                             draftSelection.add(checkbox.value);
@@ -644,41 +725,66 @@
                     });
                 });
 
-                searchInput.addEventListener("input", () => {
-                    window.clearTimeout(searchTimerId);
-                    searchTimerId = window.setTimeout(renderOptions, 250);
-                });
+                if (searchInput) {
+                    searchInput.addEventListener("input", () => {
+                        window.clearTimeout(searchTimerId);
+                        searchTimerId = window.setTimeout(renderOptions, config.searchDebounceMs || 250);
+                    });
+                }
 
                 applyButton.addEventListener("click", () => {
+                    const appliedSelection = normalizedSelection(draftSelection);
                     currentSelection.clear();
-                    draftSelection.forEach((value) => currentSelection.add(value));
-                    buildMunicipalityHiddenInputs(Array.from(currentSelection));
-                    updateTriggerLabel(currentSelection.size);
-
-                    const pageInput = form.querySelector('input[name="page"]');
-                    if (pageInput) {
-                        pageInput.remove();
-                    }
-                    form.querySelectorAll('input[name="page"][type="hidden"]').forEach((input) => input.remove());
-
+                    appliedSelection.forEach((value) => currentSelection.add(value));
+                    buildHiddenInputs(
+                        hiddenContainer,
+                        config.paramName,
+                        shouldOmitFromUrl(appliedSelection) ? [] : Array.from(appliedSelection)
+                    );
+                    updateTriggerLabel(appliedSelection);
+                    clearPageInputs();
                     setOpen(false);
                     submit();
                 });
 
                 resetButton.addEventListener("click", () => {
-                    draftSelection.clear();
+                    const resetSelection = config.emptyMeansAll ? new Set(allValues) : new Set();
+                    draftSelection = new Set(resetSelection);
                     currentSelection.clear();
-                    searchInput.value = "";
-                    buildMunicipalityHiddenInputs([]);
-                    updateTriggerLabel(0);
+                    resetSelection.forEach((value) => currentSelection.add(value));
+                    if (searchInput) {
+                        searchInput.value = "";
+                    }
+                    buildHiddenInputs(hiddenContainer, config.paramName, []);
+                    updateTriggerLabel(resetSelection);
                     renderOptions();
                     setOpen(false);
                     submit();
                 });
 
-                updateTriggerLabel(currentSelection.size);
+                updateTriggerLabel(currentSelection);
                 renderOptions();
-            }
+            };
+
+            setupPopupFilter(form.querySelector("[data-municipality-filter]"), {
+                paramName: "municipality",
+                omitWhenAllSelected: false,
+                emptyMeansAll: false,
+                searchDebounceMs: 250,
+                getLabel: (selectedCount) => selectedCount ? `Муниципалитет: ${selectedCount}` : "Муниципалитет",
+            });
+
+            setupPopupFilter(form.querySelector('[data-popup-filter-name="deal_type"]'), {
+                paramName: "deal_type",
+                omitWhenAllSelected: true,
+                emptyMeansAll: true,
+                getLabel: (selectedCount, totalCount) => {
+                    if (!selectedCount || selectedCount === totalCount) {
+                        return "Тип сделки";
+                    }
+                    return `Тип сделки: ${selectedCount}`;
+                },
+            });
         }
 
         document.querySelectorAll("form[data-preserve-scroll]").forEach((quickActionForm) => {

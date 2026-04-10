@@ -33,6 +33,11 @@ PARTICIPATION_SOURCE_LABELS = {
     "unknown": "Не определено",
 }
 
+DEAL_TYPE_LABELS = {
+    "sale": "Продажа",
+    "rent": "Аренда",
+}
+
 CURRENCY_LABELS = {
     "643": "руб.",
     "RUB": "руб.",
@@ -64,6 +69,11 @@ def participation_type_label(value):
 @register.filter
 def participation_source_label(value):
     return _label_for(value, PARTICIPATION_SOURCE_LABELS)
+
+
+@register.filter
+def deal_type_label(value):
+    return _label_for(value, DEAL_TYPE_LABELS)
 
 
 @register.filter

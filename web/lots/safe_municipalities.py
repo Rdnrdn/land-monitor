@@ -8,12 +8,30 @@ analytically unsafe values and parsing artefacts.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass
 from functools import lru_cache
 
-from land_monitor.services.municipalities import normalize_municipality_name, slugify_municipality_name
-
 MOSCOW_OBLAST_SLUG = "moskovskaya-oblast"
+
+
+def normalize_municipality_name(value: str | None) -> str | None:
+    if value is None:
+        return None
+    candidate = unicodedata.normalize("NFKC", value).strip()
+    if not candidate:
+        return None
+    candidate = candidate.replace("Ё", "Е").replace("ё", "е")
+    candidate = re.sub(r"\s+", " ", candidate)
+    return candidate.lower()
+
+
+def slugify_municipality_name(value: str) -> str:
+    candidate = normalize_municipality_name(value) or ""
+    candidate = re.sub(r"[^0-9a-zа-я]+", "-", candidate)
+    candidate = re.sub(r"-{2,}", "-", candidate).strip("-")
+    return candidate or "municipality"
 
 
 @dataclass(frozen=True)

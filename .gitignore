@@ -10,3 +10,5 @@ media/
 *.log
 .local/
 *.tar.gz
+.env.backup*
+.env.disabled

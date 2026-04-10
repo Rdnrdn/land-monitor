@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import sys
 from logging.config import fileConfig
+from urllib.parse import quote_plus
 
 from alembic import context
 import sqlalchemy as sa
@@ -68,13 +69,38 @@ def ensure_version_table_shape(connection: sa.Connection) -> None:
 
 
 def get_url() -> str:
-    return os.getenv("DATABASE_URL", os.getenv("LAND_DB_URL", ""))
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return database_url
+
+    land_db_url = os.getenv("LAND_DB_URL")
+    if land_db_url:
+        return land_db_url
+
+    host = os.getenv("LAND_DB_HOST")
+    port = os.getenv("LAND_DB_PORT")
+    name = os.getenv("LAND_DB_NAME")
+    user = os.getenv("LAND_DB_USER")
+    password = os.getenv("LAND_DB_PASSWORD")
+    if not all([host, port, name, user, password]):
+        return ""
+
+    return "postgresql://{user}:{password}@{host}:{port}/{name}".format(
+        user=quote_plus(user),
+        password=quote_plus(password),
+        host=host,
+        port=port,
+        name=quote_plus(name),
+    )
 
 
 def run_migrations_offline() -> None:
     url = get_url()
     if not url:
-        raise RuntimeError("DATABASE_URL or LAND_DB_URL must be set for alembic offline mode.")
+        raise RuntimeError(
+            "DATABASE_URL, LAND_DB_URL, or LAND_DB_HOST/LAND_DB_PORT/LAND_DB_NAME/"
+            "LAND_DB_USER/LAND_DB_PASSWORD must be set for alembic offline mode."
+        )
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -92,7 +118,10 @@ def run_migrations_online() -> None:
     if db_url:
         configuration["sqlalchemy.url"] = db_url
     elif "sqlalchemy.url" not in configuration:
-        raise RuntimeError("DATABASE_URL or LAND_DB_URL must be set for alembic.")
+        raise RuntimeError(
+            "DATABASE_URL, LAND_DB_URL, or LAND_DB_HOST/LAND_DB_PORT/LAND_DB_NAME/"
+            "LAND_DB_USER/LAND_DB_PASSWORD must be set for alembic."
+        )
 
     connectable = engine_from_config(
         configuration,

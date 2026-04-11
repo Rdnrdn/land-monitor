@@ -5,7 +5,6 @@ from collections import Counter
 from datetime import date, datetime
 from functools import cached_property
 
-import requests
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
@@ -65,8 +64,6 @@ DEAL_TYPE_LABELS = {
     "sale": "Продажа",
     "rent": "Аренда",
 }
-LOTCARD_API_URL = "https://torgi.gov.ru/new/api/public/lotcards"
-LOTCARD_TIMEOUT_SECONDS = 5
 SUBJECT_RF_LABELS = {
     "40": "Калужская область",
     "47": "Ленинградская область",
@@ -186,7 +183,7 @@ def _display_text_key(value: object) -> str:
 
 def _get_lot_estate_address_display(lot: Lot, lotcard_data: dict | None = None) -> str | None:
     raw_data = lot.raw_data if isinstance(lot.raw_data, dict) else {}
-    lotcard_data = lotcard_data if isinstance(lotcard_data, dict) else {}
+    lotcard_data = lotcard_data if isinstance(lotcard_data, dict) else _get_lotcard_snapshot(lot)
     estate_address = _clean_display_text(
         lotcard_data.get("estateAddress") or raw_data.get("estateAddress")
     )
@@ -259,23 +256,15 @@ def _build_display_row(
     }
 
 
-def _fetch_lotcard_data(source_lot_id: str | None) -> dict | None:
-    if not source_lot_id:
-        return None
-    try:
-        response = requests.get(
-            f"{LOTCARD_API_URL}/{source_lot_id}",
-            headers={
-                "Accept": "application/json",
-                "User-Agent": "land-monitor-detail-lotcard/1.0",
-            },
-            timeout=LOTCARD_TIMEOUT_SECONDS,
-        )
-        response.raise_for_status()
-        payload = response.json()
-    except (requests.RequestException, ValueError):
-        return None
-    return payload if isinstance(payload, dict) else None
+def _get_lotcard_snapshot(lot: Lot) -> dict:
+    raw_data = lot.raw_data if isinstance(lot.raw_data, dict) else {}
+    lotcard_data = raw_data.get("lotcard")
+    if not isinstance(lotcard_data, dict):
+        return {}
+    nested_data = lotcard_data.get("data")
+    if isinstance(nested_data, dict):
+        return nested_data
+    return lotcard_data
 
 
 def _subject_rf_display(lotcard_data: dict) -> str | None:
@@ -616,7 +605,8 @@ class LotListView(LoginRequiredMixin, ListView):
 
         if self.location_query:
             queryset = queryset.filter(
-                Q(address__icontains=self.location_query)
+                Q(raw_data__lotcard__estateAddress__icontains=self.location_query)
+                | Q(address__icontains=self.location_query)
                 | Q(district__icontains=self.location_query)
                 | Q(raw_data__estateAddress__icontains=self.location_query)
             )
@@ -918,7 +908,7 @@ class LotDetailView(LoginRequiredMixin, DetailView):
             raw_name=self.object.municipality_name,
         )
         context["canonical_municipality_label"] = canonical_municipality_label
-        lotcard_data = _fetch_lotcard_data(self.object.source_lot_id)
+        lotcard_data = _get_lotcard_snapshot(self.object)
         estate_address_display = _get_lot_estate_address_display(self.object, lotcard_data)
         context["estate_address_display"] = estate_address_display
         context["detail_rows"] = _build_lot_detail_rows(

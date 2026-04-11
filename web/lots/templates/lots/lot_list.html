@@ -409,7 +409,7 @@
                                     {% endif %}
                                 </div>
                                 <h3 class="lot-card__title">
-                                    <a href="{% url 'lots:detail' lot.pk %}">{{ lot.title|default:"Без названия" }}</a>
+                                    <a href="{% url 'lots:detail' lot.pk %}" data-lot-detail-link>{{ lot.title|default:"Без названия" }}</a>
                                 </h3>
                                 <p class="lot-card__subtitle">
                                     {{ lot.address|default:lot.district|default:"Адрес не указан" }}
@@ -521,7 +521,7 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="set_status">
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                    <select name="user_status" aria-label="Статус" onchange="this.form.submit()">
+                                    <select name="user_status" aria-label="Статус" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
                                         {% for value, label in user_status_choices %}
                                             <option value="{{ value }}" {% if lot.user_lot_state and lot.user_lot_state.user_status == value %}selected{% endif %}>
                                                 {{ value|user_status_label }}
@@ -818,6 +818,17 @@
 
         document.querySelectorAll("form[data-preserve-scroll]").forEach((quickActionForm) => {
             quickActionForm.addEventListener("submit", () => {
+                window.sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
+            });
+        });
+
+        document.querySelectorAll("[data-lot-detail-link]").forEach((detailLink) => {
+            detailLink.addEventListener("click", () => {
+                const listState = {
+                    url: window.location.pathname + window.location.search,
+                    scrollY: window.scrollY,
+                };
+                window.sessionStorage.setItem("land-monitor:list-state", JSON.stringify(listState));
                 window.sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
             });
         });

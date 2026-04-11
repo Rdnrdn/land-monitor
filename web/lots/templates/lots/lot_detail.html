@@ -43,7 +43,7 @@
                 <div class="muted">Карточка лота</div>
                 <h2 style="margin: 6px 0 0;">{{ lot.title|default:"Без названия" }}</h2>
             </div>
-            <a class="button button--ghost" href="{% url 'lots:list' %}">К списку</a>
+            <a class="button button--ghost" href="{% url 'lots:list' %}" data-back-to-list>К списку</a>
         </div>
     </div>
 </section>
@@ -193,7 +193,7 @@
         {% endif %}
         <h3>Быстрые действия</h3>
         <div class="inline-actions">
-            <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+            <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form" data-preserve-scroll>
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle_favorite">
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -201,17 +201,17 @@
                     {% if user_lot and user_lot.is_favorite %}Убрать из избранного{% else %}В избранное{% endif %}
                 </button>
             </form>
-            <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+            <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form" data-preserve-scroll>
                 {% csrf_token %}
                 <input type="hidden" name="action" value="set_status">
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                <select name="user_status" aria-label="Статус" onchange="this.form.submit()">
+                <select name="user_status" aria-label="Статус" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
                     {% for value, label in user_status_choices %}
                         <option value="{{ value }}" {% if user_lot and user_lot.user_status == value %}selected{% endif %}>{{ value|user_status_label }}</option>
                     {% endfor %}
                 </select>
             </form>
-            <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+            <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form" data-preserve-scroll>
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle_needs_inspection">
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -219,7 +219,7 @@
                     {% if user_lot and user_lot.needs_inspection %}Снять осмотр{% else %}Нужен осмотр{% endif %}
                 </button>
             </form>
-            <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+            <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form" data-preserve-scroll>
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle_needs_legal_check">
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -227,7 +227,7 @@
                     {% if user_lot and user_lot.needs_legal_check %}Снять юр. проверку{% else %}Нужна юр. проверка{% endif %}
                 </button>
             </form>
-            <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form">
+            <form method="post" action="{% url 'lots:action' lot.pk %}" class="inline-form" data-preserve-scroll>
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle_deposit_paid">
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -242,6 +242,124 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script>
+    (function () {
+        const detailScrollStorageKey = "land-monitor:detail-scroll:" + window.location.pathname + window.location.search;
+        if ("scrollRestoration" in window.history) {
+            window.history.scrollRestoration = "manual";
+        }
+
+        function getQuickActionName(form) {
+            const actionInput = form.querySelector('input[name="action"]');
+            return actionInput ? actionInput.value : "";
+        }
+
+        function saveDetailScroll(form) {
+            const formRect = form.getBoundingClientRect();
+            window.sessionStorage.setItem(
+                detailScrollStorageKey,
+                JSON.stringify({
+                    action: getQuickActionName(form),
+                    scrollY: window.scrollY,
+                    viewportTop: formRect.top,
+                })
+            );
+        }
+
+        function readSavedScrollState() {
+            const savedValue = window.sessionStorage.getItem(detailScrollStorageKey);
+            if (savedValue === null) {
+                return null;
+            }
+
+            try {
+                const parsedValue = JSON.parse(savedValue);
+                if (
+                    parsedValue
+                    && typeof parsedValue === "object"
+                    && Number.isFinite(Number(parsedValue.scrollY))
+                ) {
+                    return parsedValue;
+                }
+            } catch (error) {
+                const legacyScrollY = Number(savedValue);
+                if (Number.isFinite(legacyScrollY)) {
+                    return { scrollY: legacyScrollY };
+                }
+            }
+
+            return null;
+        }
+
+        const savedScrollState = readSavedScrollState();
+        if (savedScrollState) {
+            const targetScrollY = Number(savedScrollState.scrollY);
+            const targetViewportTop = Number(savedScrollState.viewportTop);
+            const targetAction = savedScrollState.action;
+
+            const restoreScroll = () => {
+                if (!targetAction || !Number.isFinite(targetViewportTop)) {
+                    window.scrollTo(0, targetScrollY);
+                    return;
+                }
+
+                const targetForm = Array.from(document.querySelectorAll("form[data-preserve-scroll]")).find((form) => {
+                    return getQuickActionName(form) === targetAction;
+                });
+
+                if (!targetForm) {
+                    window.scrollTo(0, targetScrollY);
+                    return;
+                }
+
+                const currentViewportTop = targetForm.getBoundingClientRect().top;
+                window.scrollBy(0, currentViewportTop - targetViewportTop);
+            };
+
+            restoreScroll();
+            window.requestAnimationFrame(restoreScroll);
+            window.setTimeout(restoreScroll, 80);
+            window.setTimeout(() => {
+                restoreScroll();
+                window.sessionStorage.removeItem(detailScrollStorageKey);
+            }, 240);
+            window.addEventListener("load", restoreScroll, { once: true });
+            window.addEventListener("pageshow", restoreScroll, { once: true });
+        }
+
+        document.querySelectorAll("form[data-preserve-scroll]").forEach((quickActionForm) => {
+            quickActionForm.addEventListener("pointerdown", (event) => {
+                if (event.target.closest('button[type="submit"], input[type="submit"], select')) {
+                    saveDetailScroll(quickActionForm);
+                }
+            }, { capture: true });
+            quickActionForm.addEventListener("keydown", (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    saveDetailScroll(quickActionForm);
+                }
+            }, { capture: true });
+            quickActionForm.addEventListener("change", () => saveDetailScroll(quickActionForm), { capture: true });
+            quickActionForm.addEventListener("submit", () => saveDetailScroll(quickActionForm));
+        });
+
+        const backToListLink = document.querySelector("[data-back-to-list]");
+        if (backToListLink) {
+            try {
+                const rawListState = window.sessionStorage.getItem("land-monitor:list-state");
+                const listState = rawListState ? JSON.parse(rawListState) : null;
+                if (
+                    listState
+                    && typeof listState.url === "string"
+                    && listState.url.startsWith("/lots")
+                ) {
+                    backToListLink.setAttribute("href", listState.url);
+                }
+            } catch (error) {
+                window.sessionStorage.removeItem("land-monitor:list-state");
+            }
+        }
+    })();
+</script>
 {% if notice_documents|length > 10 %}
     <script>
         (function () {

@@ -343,6 +343,10 @@
                     <input id="id_price_max" type="number" step="0.01" name="price_max" value="{{ request.GET.price_max }}" placeholder="Например, 5000000" data-debounce-submit>
                 </div>
                 <div class="field field--compact">
+                    <label for="id_location">Местоположение</label>
+                    <input id="id_location" type="text" name="location" value="{{ location_query }}" placeholder="Например, Кукино" data-debounce-submit>
+                </div>
+                <div class="field field--compact">
                     <label for="id_ordering_mirror">Сортировка</label>
                     <select id="id_ordering_mirror" name="ordering" data-auto-submit>
                         {% for value, label in ordering_options %}
@@ -363,6 +367,7 @@
                     {% endif %}
                     {% if request.GET.status %}<span class="badge">{{ request.GET.status }}</span>{% endif %}
                     {% if request.GET.price_min or request.GET.price_max %}<span class="badge">Цена</span>{% endif %}
+                    {% if location_query %}<span class="badge">Местоположение: {{ location_query }}</span>{% endif %}
                 </div>
                 <div class="actions">
                     <button type="submit">Применить</button>

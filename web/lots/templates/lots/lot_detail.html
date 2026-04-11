@@ -83,6 +83,28 @@
     </div>
 </section>
 
+{% if lotcard_rows %}
+    <section class="panel">
+        <div class="panel__body">
+            <h3 style="margin-top: 0;">Данные лота из источника</h3>
+            <dl class="kv">
+                {% for row in lotcard_rows %}
+                    <dt>{{ row.label }}</dt>
+                    <dd>
+                        {% if row.is_url %}
+                            <a href="{{ row.value }}" target="_blank" rel="noreferrer">{{ row.value }}</a>
+                        {% elif row.is_date %}
+                            {{ row.value|date:"d.m.Y H:i" }}
+                        {% else %}
+                            {{ row.value }}
+                        {% endif %}
+                    </dd>
+                {% endfor %}
+            </dl>
+        </div>
+    </section>
+{% endif %}
+
 {% if notice_rows %}
     <section class="panel">
         <div class="panel__body">

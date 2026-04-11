@@ -1,9 +1,11 @@
 import json
+import re
 import uuid
 from collections import Counter
 from datetime import date, datetime
 from functools import cached_property
 
+import requests
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
@@ -13,6 +15,7 @@ from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import DetailView, ListView
@@ -61,6 +64,30 @@ PER_PAGE_OPTIONS = (25, 50, 100)
 DEAL_TYPE_LABELS = {
     "sale": "Продажа",
     "rent": "Аренда",
+}
+LOTCARD_API_URL = "https://torgi.gov.ru/new/api/public/lotcards"
+LOTCARD_TIMEOUT_SECONDS = 5
+SUBJECT_RF_LABELS = {
+    "40": "Калужская область",
+    "47": "Ленинградская область",
+    "50": "Московская область",
+    "71": "Тульская область",
+    "77": "Москва",
+}
+LOW_SIGNAL_LOTCARD_VALUES = {
+    "согласно извещению",
+    "согласно извещению о проведении аукциона",
+    "не указано",
+    "отсутствует",
+    "-",
+    "—",
+}
+LOTCARD_ATTRIBUTE_LABELS = {
+    "обременения реализуемого имущества": "Обременения",
+    "срок и порядок внесения задатка": "Срок и порядок внесения задатка",
+    "порядок ознакомления с имуществом": "Порядок ознакомления с имуществом",
+    "срок заключения договора": "Срок заключения договора",
+    "условия договора, заключаемого по результатам торгов": "Условия договора",
 }
 
 
@@ -133,6 +160,43 @@ def _has_detail_value(value) -> bool:
     return value is not None and value != ""
 
 
+def _clean_display_text(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        for key in ("name", "value", "fullName"):
+            cleaned = _clean_display_text(value.get(key))
+            if cleaned:
+                return cleaned
+        return None
+    if isinstance(value, list):
+        parts = [_clean_display_text(item) for item in value]
+        parts = [part for part in parts if part]
+        return ", ".join(parts) if parts else None
+
+    cleaned = re.sub(r"\s+", " ", str(value)).strip()
+    if not cleaned or cleaned.casefold() in {"none", "null"}:
+        return None
+    return cleaned
+
+
+def _display_text_key(value: object) -> str:
+    return re.sub(r"\s+", " ", str(value)).strip().casefold()
+
+
+def _get_lot_estate_address_display(lot: Lot, lotcard_data: dict | None = None) -> str | None:
+    raw_data = lot.raw_data if isinstance(lot.raw_data, dict) else {}
+    lotcard_data = lotcard_data if isinstance(lotcard_data, dict) else {}
+    estate_address = _clean_display_text(
+        lotcard_data.get("estateAddress") or raw_data.get("estateAddress")
+    )
+    if not estate_address:
+        return None
+    if lot.address and _display_text_key(lot.address) == _display_text_key(estate_address):
+        return None
+    return estate_address
+
+
 def _get_lot_deal_type(lot: Lot) -> str | None:
     raw_data = lot.raw_data if isinstance(lot.raw_data, dict) else {}
     deal_type = raw_data.get("typeTransaction")
@@ -141,7 +205,188 @@ def _get_lot_deal_type(lot: Lot) -> str | None:
     return deal_type
 
 
-def _build_lot_detail_rows(lot: Lot, *, canonical_municipality_label: str | None) -> list[dict[str, object]]:
+def _get_lotcard_deal_type(lotcard_data: dict) -> str | None:
+    deal_type = lotcard_data.get("typeTransaction")
+    if deal_type in DEAL_TYPE_LABELS:
+        return DEAL_TYPE_LABELS[deal_type]
+    return _clean_display_text(deal_type)
+
+
+def _is_useful_lotcard_text(value: object) -> bool:
+    cleaned = _clean_display_text(value)
+    if not cleaned:
+        return False
+    return cleaned.casefold() not in LOW_SIGNAL_LOTCARD_VALUES
+
+
+def _parse_lotcard_datetime(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        return None
+    parsed = parse_datetime(value)
+    return parsed
+
+
+def _format_money(value: object) -> str | None:
+    if value in (None, ""):
+        return None
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        return _clean_display_text(value)
+    return f"{amount:,.2f} руб.".replace(",", " ")
+
+
+def _is_valid_url(value: object) -> bool:
+    return isinstance(value, str) and value.startswith(("http://", "https://"))
+
+
+def _build_display_row(
+    label: str,
+    value: object,
+    *,
+    is_date: bool = False,
+    is_url: bool = False,
+) -> dict[str, object] | None:
+    if not _has_detail_value(value):
+        return None
+    return {
+        "label": label,
+        "value": value,
+        "is_date": is_date,
+        "is_url": is_url,
+    }
+
+
+def _fetch_lotcard_data(source_lot_id: str | None) -> dict | None:
+    if not source_lot_id:
+        return None
+    try:
+        response = requests.get(
+            f"{LOTCARD_API_URL}/{source_lot_id}",
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "land-monitor-detail-lotcard/1.0",
+            },
+            timeout=LOTCARD_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except (requests.RequestException, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _subject_rf_display(lotcard_data: dict) -> str | None:
+    code = _clean_display_text(lotcard_data.get("subjectRFCode"))
+    name = _clean_display_text(lotcard_data.get("subjectRFName"))
+    if not name and code:
+        name = SUBJECT_RF_LABELS.get(code)
+    if name and code:
+        return f"{name} ({code})"
+    return name or (f"код {code}" if code else None)
+
+
+def _point_display(lotcard_data: dict) -> str | None:
+    point = lotcard_data.get("point")
+    if not isinstance(point, dict):
+        return None
+    lat = point.get("lat")
+    lon = point.get("lon")
+    if lat in (None, "") or lon in (None, ""):
+        return None
+    return f"{lat}, {lon}"
+
+
+def _lotcard_attribute_label(full_name: str) -> str | None:
+    normalized = _display_text_key(full_name)
+    for needle, label in LOTCARD_ATTRIBUTE_LABELS.items():
+        if needle in normalized:
+            return label
+    if "ознаком" in normalized and ("имуществ" in normalized or "схем" in normalized):
+        return "Порядок ознакомления с имуществом"
+    return None
+
+
+def _lotcard_attribute_rows(lotcard_data: dict) -> list[dict[str, object]]:
+    attributes = lotcard_data.get("attributes")
+    if not isinstance(attributes, list):
+        return []
+
+    rows: list[dict[str, object]] = []
+    seen_labels: set[str] = set()
+    for item in attributes:
+        if not isinstance(item, dict):
+            continue
+        full_name = _clean_display_text(item.get("fullName"))
+        if not full_name:
+            continue
+        label = _lotcard_attribute_label(full_name)
+        value = _clean_display_text(item.get("value"))
+        if not label or not _is_useful_lotcard_text(value) or label in seen_labels:
+            continue
+        rows.append({"label": label, "value": value, "is_date": False, "is_url": False})
+        seen_labels.add(label)
+    return rows
+
+
+def _build_lotcard_rows(
+    lot: Lot,
+    lotcard_data: dict | None,
+) -> list[dict[str, object]]:
+    if not isinstance(lotcard_data, dict):
+        return []
+
+    rows: list[dict[str, object]] = []
+
+    def add(row: dict[str, object] | None) -> None:
+        if row is not None:
+            rows.append(row)
+
+    if lot.deposit_amount is None:
+        add(_build_display_row("Задаток", _format_money(lotcard_data.get("deposit"))))
+
+    date_fields = (
+        ("Дата начала торгов", "auctionStartDate", lot.auction_date),
+        ("Начало подачи заявок", "biddStartTime", lot.application_start_date),
+        ("Окончание подачи заявок", "biddEndTime", lot.application_deadline),
+    )
+    for label, key, existing_value in date_fields:
+        if existing_value:
+            continue
+        value = _parse_lotcard_datetime(lotcard_data.get(key))
+        add(_build_display_row(label, value, is_date=True))
+
+    if not _get_lot_deal_type(lot):
+        add(_build_display_row("Тип сделки", _get_lotcard_deal_type(lotcard_data)))
+
+    etp_url = lotcard_data.get("etpUrl")
+    if _is_valid_url(etp_url):
+        add(_build_display_row("Ссылка на площадку", etp_url, is_url=True))
+
+    add(_build_display_row("Субъект местонахождения имущества", _subject_rf_display(lotcard_data)))
+    add(_build_display_row("Координаты", _point_display(lotcard_data)))
+
+    lot_description = _clean_display_text(lotcard_data.get("lotDescription"))
+    if (
+        lot_description
+        and lot.title
+        and _display_text_key(lot_description) != _display_text_key(lot.title)
+        and (not lot.description or _display_text_key(lot_description) != _display_text_key(lot.description))
+    ):
+        add(_build_display_row("Описание lotcard", lot_description))
+
+    rows.extend(_lotcard_attribute_rows(lotcard_data))
+    return rows
+
+
+def _build_lot_detail_rows(
+    lot: Lot,
+    *,
+    canonical_municipality_label: str | None,
+    estate_address_display: str | None,
+) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = [
         {"label": "ID", "value": lot.id},
         {"label": "Источник", "value": lot.source},
@@ -166,6 +411,7 @@ def _build_lot_detail_rows(lot: Lot, *, canonical_municipality_label: str | None
     optional_rows = (
         ("Район", lot.district),
         ("Адрес", lot.address),
+        ("Местонахождение имущества", estate_address_display),
         ("FIAS GUID", lot.fias_guid),
         ("Кадастровый номер", lot.cadastre_number),
         ("Площадь, м²", lot.area_m2),
@@ -368,6 +614,13 @@ class LotListView(LoginRequiredMixin, ListView):
         if apply_deal_type_filter and self.is_deal_type_filter_active:
             queryset = queryset.filter(raw_data__typeTransaction__in=self.selected_deal_types)
 
+        if self.location_query:
+            queryset = queryset.filter(
+                Q(address__icontains=self.location_query)
+                | Q(district__icontains=self.location_query)
+                | Q(raw_data__estateAddress__icontains=self.location_query)
+            )
+
         is_active = self.request.GET.get("is_active")
         if is_active == "true":
             queryset = queryset.filter(is_active=True)
@@ -481,6 +734,10 @@ class LotListView(LoginRequiredMixin, ListView):
         return set(self.selected_deal_types) != set(DEAL_TYPE_LABELS.keys())
 
     @cached_property
+    def location_query(self) -> str:
+        return (self.request.GET.get("location") or "").strip()
+
+    @cached_property
     def municipality_option_counts(self) -> dict[str, int]:
         if not self.show_municipality_filter:
             return {}
@@ -580,6 +837,7 @@ class LotListView(LoginRequiredMixin, ListView):
             Region.objects.filter(is_active=True).order_by("sort_order", "name")
         )
         context["selected_region"] = self.selected_region
+        context["location_query"] = self.location_query
         context["show_municipality_filter"] = self.show_municipality_filter
         context["municipality_options"] = [
             {
@@ -631,6 +889,7 @@ class LotListView(LoginRequiredMixin, ListView):
             "status",
             "region",
             "is_active",
+            "location",
         )
         context["active_filter_count"] = sum(
             1 for param in active_filter_params if self.request.GET.get(param)
@@ -659,11 +918,16 @@ class LotDetailView(LoginRequiredMixin, DetailView):
             raw_name=self.object.municipality_name,
         )
         context["canonical_municipality_label"] = canonical_municipality_label
+        lotcard_data = _fetch_lotcard_data(self.object.source_lot_id)
+        estate_address_display = _get_lot_estate_address_display(self.object, lotcard_data)
+        context["estate_address_display"] = estate_address_display
         context["detail_rows"] = _build_lot_detail_rows(
             self.object,
             canonical_municipality_label=canonical_municipality_label,
+            estate_address_display=estate_address_display,
         )
         context["detail_date_rows"] = _build_lot_detail_date_rows(self.object)
+        context["lotcard_rows"] = _build_lotcard_rows(self.object, lotcard_data)
         context.update(_build_lot_notice_context(self.object))
         return context
 

@@ -221,12 +221,46 @@ def _version_key_values(item: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def _version_identity(key_values: dict[str, Any]) -> tuple[str, str, str, str]:
+def _normalize_publish_datetime_for_identity(value: datetime) -> datetime:
+    """Align candidate vs DB timestamps so planning and ledger lookups agree."""
+    dt = value
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return dt.replace(microsecond=0)
+
+
+def _ledger_version_identity(
+    reg_num: str,
+    document_type: str,
+    publish_date: datetime,
+    href: str,
+) -> tuple[str, str, str, str]:
+    norm = _normalize_publish_datetime_for_identity(publish_date)
     return (
+        str(reg_num).strip(),
+        str(document_type).strip(),
+        norm.isoformat(),
+        str(href).strip(),
+    )
+
+
+def _ledger_version_identity_from_key_values(key_values: dict[str, Any]) -> tuple[str, str, str, str]:
+    return _ledger_version_identity(
         str(key_values["reg_num"]),
         str(key_values["document_type"]),
-        key_values["publish_date"].isoformat(),
+        key_values["publish_date"],
         str(key_values["href"]),
+    )
+
+
+def _ledger_version_identity_from_row(row: OpendataNoticeVersion) -> tuple[str, str, str, str]:
+    return _ledger_version_identity(
+        str(row.reg_num),
+        str(row.document_type),
+        row.publish_date,
+        str(row.href),
     )
 
 
@@ -272,14 +306,7 @@ def _processed_version_identities(
             .all()
         )
         for row in rows:
-            processed.add(
-                (
-                    str(row.reg_num),
-                    str(row.document_type),
-                    row.publish_date.isoformat(),
-                    str(row.href),
-                )
-            )
+            processed.add(_ledger_version_identity_from_row(row))
     return processed
 
 
@@ -290,7 +317,7 @@ def _filter_backlog_pairs(
     return [
         (item, key_values)
         for item, key_values in candidate_pairs
-        if _version_identity(key_values) not in processed_identities
+        if _ledger_version_identity_from_key_values(key_values) not in processed_identities
     ]
 
 
@@ -368,6 +395,13 @@ class Command(BaseCommand):
             "--report-path",
             default=None,
             help="Optional JSON report path. Defaults to .local/diagnostics/opendata_notice_ingest_<range>.json.",
+        )
+        parser.add_argument(
+            "--batch-identity-sample",
+            type=int,
+            default=0,
+            metavar="N",
+            help="Include first N planned-batch rows (reg_num, canonical publish, href prefix) in the JSON report for debugging.",
         )
 
     def handle(self, *args, **options):
@@ -503,6 +537,8 @@ class Command(BaseCommand):
             if max_hrefs > 0
             else backlog_candidate_pairs
         )
+        hrefs_sent_to_processing = len(selected_candidate_pairs)
+        batch_identity_sample_n = max(0, int(options["batch_identity_sample"]))
 
         href_downloaded = 0
         created = 0
@@ -663,6 +699,32 @@ class Command(BaseCommand):
 
             time.sleep(options["delay"])
 
+        fully_skipped_planned_batch = (
+            hrefs_sent_to_processing > 0
+            and skipped_processed == hrefs_sent_to_processing
+            and href_downloaded == 0
+            and processed_count == 0
+        )
+        suspected_planning_ledger_identity_mismatch = fully_skipped_planned_batch
+        backlog_remaining_after_planned = max(0, len(backlog_candidate_pairs) - hrefs_sent_to_processing)
+
+        planned_batch_identity_debug_sample: list[dict[str, Any]] = []
+        if batch_identity_sample_n > 0:
+            for _, kv in selected_candidate_pairs[:batch_identity_sample_n]:
+                planned_batch_identity_debug_sample.append(
+                    {
+                        "reg_num": kv["reg_num"],
+                        "document_type": kv["document_type"],
+                        "publish_date_canonical": _normalize_publish_datetime_for_identity(
+                            kv["publish_date"]
+                        ).isoformat(),
+                        "ledger_identity": _ledger_version_identity_from_key_values(kv),
+                        "href_prefix": (kv["href"][:160] + "…")
+                        if len(kv["href"]) > 160
+                        else kv["href"],
+                    }
+                )
+
         report_path = Path(options["report_path"] or f".local/diagnostics/opendata_notice_ingest_{date_from}_{date_to}.json")
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report = {
@@ -689,10 +751,16 @@ class Command(BaseCommand):
             "hrefs_effective_backlog": len(backlog_candidate_pairs),
             "hrefs_planned_for_batch": len(selected_candidate_pairs),
             "hrefs_planned": len(selected_candidate_pairs),
+            "hrefs_sent_to_processing": hrefs_sent_to_processing,
+            "hrefs_skipped_by_late_ledger_check": skipped_processed,
             "unique_versions_detected": unique_versions_detected,
             "ledger_found": ledger_found,
             "ledger_created": ledger_created,
             "skipped_processed": skipped_processed,
+            "planned_batch_all_skipped_as_processed": fully_skipped_planned_batch,
+            "suspected_planning_ledger_identity_mismatch": suspected_planning_ledger_identity_mismatch,
+            "effective_backlog_remaining_after_planned": backlog_remaining_after_planned,
+            "planned_batch_identity_debug_sample": planned_batch_identity_debug_sample,
             "hrefs_downloaded": href_downloaded,
             "processed": processed_count,
             "created": created,
@@ -730,10 +798,15 @@ class Command(BaseCommand):
         self.stdout.write(f"hrefs_effective_backlog={len(backlog_candidate_pairs)}")
         self.stdout.write(f"hrefs_planned_for_batch={len(selected_candidate_pairs)}")
         self.stdout.write(f"hrefs_planned={len(selected_candidate_pairs)}")
+        self.stdout.write(f"hrefs_sent_to_processing={hrefs_sent_to_processing}")
+        self.stdout.write(f"hrefs_skipped_by_late_ledger_check={skipped_processed}")
         self.stdout.write(f"unique_versions_detected={unique_versions_detected}")
         self.stdout.write(f"ledger_found={ledger_found}")
         self.stdout.write(f"ledger_created={ledger_created}")
         self.stdout.write(f"skipped_processed={skipped_processed}")
+        self.stdout.write(f"planned_batch_all_skipped_as_processed={fully_skipped_planned_batch}")
+        self.stdout.write(f"suspected_planning_ledger_identity_mismatch={suspected_planning_ledger_identity_mismatch}")
+        self.stdout.write(f"effective_backlog_remaining_after_planned={backlog_remaining_after_planned}")
         self.stdout.write(f"hrefs_downloaded={href_downloaded}")
         self.stdout.write(f"processed={processed_count}")
         self.stdout.write(f"created={created}")

@@ -1,0 +1,35 @@
+{% extends "lots/base.html" %}
+
+{% block title %}Извещение {{ notice.notice_number }} | Land Monitor{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel__body">
+        <div class="actions" style="justify-content: space-between;">
+            <div>
+                <div class="muted">Карточка извещения</div>
+                <h2 style="margin: 6px 0 0;">{{ notice.display_title|default:notice.notice_number }}</h2>
+            </div>
+            <a class="button button--ghost" href="{{ notice_back_url }}">К извещениям</a>
+        </div>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel__body">
+        <h3 style="margin-top: 0;">Основные данные</h3>
+        <dl class="kv">
+            {% for row in notice_rows %}
+                <dt>{{ row.label }}</dt>
+                <dd>
+                    {% if row.is_date %}
+                        {{ row.value|date:"d.m.Y H:i" }}
+                    {% else %}
+                        {{ row.value }}
+                    {% endif %}
+                </dd>
+            {% endfor %}
+        </dl>
+    </div>
+</section>
+{% endblock %}

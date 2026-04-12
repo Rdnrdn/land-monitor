@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.views import LoginView, LogoutView
 from django.urls import include, path
 from django.views.generic import RedirectView
+from lots.views import NoticeDetailView, NoticeListView
 
 urlpatterns = [
     path("", RedirectView.as_view(pattern_name="lots:list", permanent=False)),
@@ -15,5 +16,7 @@ urlpatterns = [
     ),
     path("accounts/logout/", LogoutView.as_view(), name="logout"),
     path("lots/", include("lots.urls")),
+    path("notices/", NoticeListView.as_view(), name="notices"),
+    path("notices/<str:notice_number>/", NoticeDetailView.as_view(), name="notice-detail"),
     path('admin/', admin.site.urls),
 ]

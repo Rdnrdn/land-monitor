@@ -82,6 +82,35 @@
             gap: 10px;
             flex-wrap: wrap;
         }
+        .topbar__nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .topbar__nav-link {
+            min-height: 34px;
+            padding: 0 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.62);
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .topbar__nav-link:hover {
+            border-color: var(--border-strong);
+            background: var(--surface-strong);
+        }
+        .topbar__nav-link.is-active {
+            border-color: var(--accent);
+            background: var(--accent-soft);
+            color: var(--accent-strong);
+        }
         .topbar__meta {
             display: inline-flex;
             align-items: center;
@@ -600,6 +629,9 @@
             .topbar__actions {
                 justify-content: flex-start;
             }
+            .topbar__nav {
+                width: 100%;
+            }
             .filters {
                 grid-template-columns: 1fr;
             }
@@ -623,6 +655,20 @@
                 <h1 class="brand"><a href="{% url 'lots:list' %}">Land Monitor</a></h1>
                 <span class="topbar__caption">Лоты и пользовательский статус</span>
             </div>
+            <nav class="topbar__nav" aria-label="Основная навигация">
+                <a
+                    class="topbar__nav-link{% if request.path|slice:':6' == '/lots/' %} is-active{% endif %}"
+                    href="{% url 'lots:list' %}"
+                >
+                    Лоты
+                </a>
+                <a
+                    class="topbar__nav-link{% if request.path|slice:':9' == '/notices/' %} is-active{% endif %}"
+                    href="{% url 'notices' %}"
+                >
+                    Извещения
+                </a>
+            </nav>
             <div class="topbar__actions">
                 {% if request.user.is_authenticated %}
                     <span class="badge badge--accent">{{ request.user.username }}</span>

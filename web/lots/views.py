@@ -19,7 +19,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import DetailView, ListView
 
-from .models import Lot, Region, Subject, UserLot, UserLotStatus
+from .models import Lot, Notice, Region, Subject, UserLot, UserLotStatus
 from .safe_municipalities import (
     MOSCOW_OBLAST_SLUG,
     SafeMunicipalityOption,
@@ -86,6 +86,19 @@ LOTCARD_ATTRIBUTE_LABELS = {
     "срок заключения договора": "Срок заключения договора",
     "условия договора, заключаемого по результатам торгов": "Условия договора",
 }
+
+
+def _notice_lots_jsonb_sql(raw_data_expression: str = "raw_data") -> str:
+    lots_expression = (
+        f"{raw_data_expression}->'opendata'->'exportObject'->'structuredObject'"
+        "->'notice'->'lots'"
+    )
+    return (
+        "CASE "
+        f"WHEN jsonb_typeof({lots_expression}) = 'array' THEN {lots_expression} "
+        "ELSE '[]'::jsonb "
+        "END"
+    )
 
 
 def _clean_distinct_values(queryset, field_name: str) -> list[str]:
@@ -555,6 +568,253 @@ def _build_lot_notice_context(lot: Lot) -> dict[str, object]:
         "notice_documents": _notice_attachments(raw_data),
         "notice_source_url": notice_source_url,
     }
+
+
+def _get_opendata_notice_payload(raw_data: object) -> dict:
+    if isinstance(raw_data, str):
+        try:
+            raw_data = json.loads(raw_data)
+        except json.JSONDecodeError:
+            return {}
+    if not isinstance(raw_data, dict):
+        return {}
+
+    opendata = raw_data.get("opendata")
+    if not isinstance(opendata, dict):
+        return {}
+
+    export_object = opendata.get("exportObject")
+    if not isinstance(export_object, dict):
+        export_object = {}
+    structured_object = export_object.get("structuredObject")
+    if not isinstance(structured_object, dict):
+        structured_object = {}
+    notice = structured_object.get("notice")
+    if isinstance(notice, dict):
+        return notice
+    if isinstance(opendata.get("notice"), dict):
+        return opendata["notice"]
+    return {}
+
+
+def _get_opendata_notice_lots(raw_data: object) -> list[dict]:
+    notice = _get_opendata_notice_payload(raw_data)
+    lots = notice.get("lots")
+    if not isinstance(lots, list):
+        return []
+    return [item for item in lots if isinstance(item, dict)]
+
+
+def _notice_lot_subject(lot_data: dict) -> tuple[str | None, str | None]:
+    bidding_object_info = lot_data.get("biddingObjectInfo")
+    if not isinstance(bidding_object_info, dict):
+        return None, None
+    subject = bidding_object_info.get("subjectRF")
+    if not isinstance(subject, dict):
+        return None, None
+    return _clean_display_text(subject.get("code")), _clean_display_text(subject.get("name"))
+
+
+def _notice_lot_address(lot_data: dict) -> str | None:
+    bidding_object_info = lot_data.get("biddingObjectInfo")
+    if isinstance(bidding_object_info, dict):
+        address = _clean_display_text(bidding_object_info.get("estateAddress"))
+        if address:
+            return address
+    return _clean_display_text(lot_data.get("estateAddress"))
+
+
+def _notice_display_title(notice: Notice, notice_payload: dict) -> str:
+    common_info = notice_payload.get("commonInfo")
+    if isinstance(common_info, dict):
+        for key in ("procedureName", "name", "biddTypeName", "biddFormName"):
+            value = _clean_display_text(common_info.get(key))
+            if value:
+                return value
+
+        for key in ("biddType", "biddForm"):
+            value = _clean_display_text(common_info.get(key))
+            if value:
+                return value
+
+    for key in ("noticeName", "name"):
+        value = _clean_display_text(notice_payload.get(key))
+        if value:
+            return value
+    return f"Извещение {notice.notice_number}"
+
+
+def _attach_notice_list_display(notice: Notice) -> None:
+    notice_payload = _get_opendata_notice_payload(notice.raw_data)
+    lots = _get_opendata_notice_lots(notice.raw_data)
+
+    subjects: dict[str, str] = {}
+    addresses: list[str] = []
+    has_documents = False
+    has_images = False
+
+    for lot_data in lots:
+        subject_code, subject_name = _notice_lot_subject(lot_data)
+        if subject_code:
+            subjects[subject_code] = subject_name or subject_code
+
+        address = _notice_lot_address(lot_data)
+        if address and address not in addresses:
+            addresses.append(address)
+
+        docs = lot_data.get("docs")
+        if isinstance(docs, list) and docs:
+            has_documents = True
+
+        image_ids = lot_data.get("imageIds")
+        if isinstance(image_ids, list) and image_ids:
+            has_images = True
+
+    notice.display_title = _notice_display_title(notice, notice_payload)
+    notice.lot_count = len(lots)
+    notice.subject_summary = ", ".join(
+        f"{name} ({code})" for code, name in sorted(subjects.items())
+    )
+    notice.address_summary = "; ".join(addresses[:3])
+    notice.has_documents = has_documents
+    notice.has_images = has_images
+
+
+class NoticeListView(LoginRequiredMixin, ListView):
+    model = Notice
+    template_name = "lots/notice_list.html"
+    context_object_name = "notices"
+    paginate_by = DEFAULT_PER_PAGE
+
+    @cached_property
+    def selected_subject_codes(self) -> list[str]:
+        valid_codes = set(Subject.objects.values_list("code", flat=True))
+        values: list[str] = []
+        for value in self.request.GET.getlist("subject"):
+            cleaned = (value or "").strip()
+            if not cleaned or cleaned not in valid_codes or cleaned in values:
+                continue
+            values.append(cleaned)
+        return values
+
+    def get_queryset(self):
+        queryset = Notice.objects.extra(where=["raw_data ? %s"], params=["opendata"])
+        if self.selected_subject_codes:
+            placeholders = ", ".join(["%s"] * len(self.selected_subject_codes))
+            lots_sql = _notice_lots_jsonb_sql()
+            queryset = queryset.extra(
+                where=[
+                    f"""
+                    EXISTS (
+                        SELECT 1
+                        FROM jsonb_array_elements({lots_sql}) AS lot_obj
+                        WHERE lot_obj->'biddingObjectInfo'->'subjectRF'->>'code' IN ({placeholders})
+                    )
+                    """
+                ],
+                params=self.selected_subject_codes,
+            )
+        return queryset.order_by("-publish_date", "-fetched_at", "notice_number")
+
+    @cached_property
+    def subject_option_counts(self) -> dict[str, int]:
+        lots_sql = _notice_lots_jsonb_sql("n.raw_data")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                WITH notice_subjects AS (
+                    SELECT DISTINCT
+                        n.notice_number,
+                        lot_obj->'biddingObjectInfo'->'subjectRF'->>'code' AS subject_code
+                    FROM notices AS n
+                    CROSS JOIN LATERAL jsonb_array_elements({lots_sql}) AS lot_obj
+                    WHERE n.raw_data ? %s
+                )
+                SELECT subject_code, COUNT(*) AS notice_count
+                FROM notice_subjects
+                WHERE subject_code IS NOT NULL AND subject_code <> ''
+                GROUP BY subject_code
+                """,
+                ["opendata"],
+            )
+            return {code: count for code, count in cursor.fetchall()}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        for notice in context["notices"]:
+            _attach_notice_list_display(notice)
+
+        page_obj = context["page_obj"]
+        paginator = page_obj.paginator
+        elided_pages = paginator.get_elided_page_range(
+            number=page_obj.number,
+            on_each_side=1,
+            on_ends=1,
+        )
+
+        context["subject_options"] = [
+            {
+                "label": subject.name,
+                "value": subject.code,
+                "count": self.subject_option_counts.get(subject.code, 0),
+                "selected": subject.code in self.selected_subject_codes,
+            }
+            for subject in Subject.objects.filter(published=True).order_by("code", "name")
+        ]
+        context["selected_subjects"] = self.selected_subject_codes
+        context["page_querystring"] = _updated_querystring(self.request, page=None)
+        context["pagination_links"] = [
+            {
+                "label": page,
+                "number": page if isinstance(page, int) else None,
+                "is_current": page == page_obj.number,
+                "is_ellipsis": page == paginator.ELLIPSIS,
+                "querystring": _updated_querystring(self.request, page=page)
+                if isinstance(page, int)
+                else "",
+            }
+            for page in elided_pages
+        ]
+        return context
+
+
+class NoticeDetailView(LoginRequiredMixin, DetailView):
+    model = Notice
+    template_name = "lots/notice_detail.html"
+    context_object_name = "notice"
+    pk_url_kwarg = "notice_number"
+
+    def get_queryset(self):
+        return Notice.objects.extra(where=["raw_data ? %s"], params=["opendata"])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        _attach_notice_list_display(self.object)
+        next_url = self.request.GET.get("next")
+        if not (
+            next_url
+            and url_has_allowed_host_and_scheme(
+                next_url,
+                allowed_hosts={self.request.get_host()},
+                require_https=self.request.is_secure(),
+            )
+        ):
+            next_url = reverse("notices")
+
+        context["notice_back_url"] = next_url
+        context["notice_rows"] = [
+            row
+            for row in (
+                _build_notice_row("Номер извещения", self.object.notice_number),
+                _build_notice_row("Дата публикации", self.object.publish_date),
+                _build_notice_row("Дата извещения", self.object.create_date),
+                _build_notice_row("Дата обновления", self.object.update_date),
+                _build_notice_row("Лотов внутри", self.object.lot_count),
+                _build_notice_row("Субъекты по лотам", self.object.subject_summary),
+            )
+            if row is not None
+        ]
+        return context
 
 
 class LotListView(LoginRequiredMixin, ListView):

@@ -30,6 +30,38 @@ class Subject(models.Model):
         return f"{self.code} {self.name}"
 
 
+class Notice(models.Model):
+    notice_number = models.TextField(primary_key=True)
+    notice_status = models.TextField(blank=True, null=True)
+    publish_date = models.DateTimeField(blank=True, null=True)
+    create_date = models.DateTimeField(blank=True, null=True)
+    update_date = models.DateTimeField(blank=True, null=True)
+    bidd_type_code = models.TextField(blank=True, null=True)
+    bidd_form_code = models.TextField(blank=True, null=True)
+    bidder_org_name = models.TextField(blank=True, null=True)
+    right_holder_name = models.TextField(blank=True, null=True)
+    auction_site_url = models.TextField(blank=True, null=True)
+    auction_site_domain = models.TextField(blank=True, null=True)
+    application_portal_url = models.TextField(blank=True, null=True)
+    application_portal_domain = models.TextField(blank=True, null=True)
+    is_pre_auction = models.BooleanField(blank=True, null=True)
+    is_39_18 = models.BooleanField(blank=True, null=True)
+    auction_is_electronic = models.BooleanField(blank=True, null=True)
+    detected_site_type = models.TextField(blank=True, null=True)
+    detected_platform_code = models.TextField(blank=True, null=True)
+    is_offline = models.BooleanField(blank=True, null=True)
+    raw_data = models.JSONField(blank=True, null=True)
+    fetched_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "notices"
+        ordering = ("-publish_date", "notice_number")
+
+    def __str__(self) -> str:
+        return self.notice_number
+
+
 class Region(models.Model):
     name = models.CharField(max_length=255)
     slug = models.CharField(max_length=100)

@@ -19,7 +19,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import DetailView, ListView
 
-from .models import Lot, Region, UserLot, UserLotStatus
+from .models import Lot, Region, Subject, UserLot, UserLotStatus
 from .safe_municipalities import (
     MOSCOW_OBLAST_SLUG,
     SafeMunicipalityOption,
@@ -576,8 +576,9 @@ class LotListView(LoginRequiredMixin, ListView):
         *,
         apply_municipality_filter: bool,
         apply_deal_type_filter: bool,
+        apply_subject_filter: bool,
     ) -> Lot.objects.none().__class__:
-        queryset = Lot.objects.select_related("user_lot", "region_ref", "municipality_ref")
+        queryset = Lot.objects.select_related("user_lot", "region_ref", "municipality_ref", "subject_ref")
 
         price_min = self.request.GET.get("price_min")
         if price_min:
@@ -593,6 +594,9 @@ class LotListView(LoginRequiredMixin, ListView):
 
         if self.selected_region is not None:
             queryset = queryset.filter(region_ref=self.selected_region)
+
+        if apply_subject_filter and self.selected_subject_codes:
+            queryset = queryset.filter(subject_ref__code__in=self.selected_subject_codes)
 
         if apply_municipality_filter and self.show_municipality_filter and self.selected_municipality_aliases:
             queryset = queryset.filter(
@@ -637,6 +641,7 @@ class LotListView(LoginRequiredMixin, ListView):
         return self._build_queryset(
             apply_municipality_filter=True,
             apply_deal_type_filter=True,
+            apply_subject_filter=True,
         ).order_by(
             self.get_ordering_value(),
             "-id",
@@ -655,6 +660,17 @@ class LotListView(LoginRequiredMixin, ListView):
         if raw_region.isdigit():
             region_query |= Q(torgi_region_code=int(raw_region))
         return Region.objects.filter(region_query).order_by("sort_order", "name").first()
+
+    @cached_property
+    def selected_subject_codes(self) -> list[str]:
+        valid_codes = set(Subject.objects.values_list("code", flat=True))
+        values: list[str] = []
+        for value in self.request.GET.getlist("subject"):
+            cleaned = (value or "").strip()
+            if not cleaned or cleaned not in valid_codes or cleaned in values:
+                continue
+            values.append(cleaned)
+        return values
 
     def get_ordering_value(self) -> str:
         ordering = self.request.GET.get("ordering", "-updated_at")
@@ -739,6 +755,7 @@ class LotListView(LoginRequiredMixin, ListView):
         rows = self._build_queryset(
             apply_municipality_filter=False,
             apply_deal_type_filter=True,
+            apply_subject_filter=True,
         ).values_list(
             "municipality_ref__normalized_name",
             "municipality_name",
@@ -767,10 +784,24 @@ class LotListView(LoginRequiredMixin, ListView):
         rows = self._build_queryset(
             apply_municipality_filter=True,
             apply_deal_type_filter=False,
+            apply_subject_filter=True,
         ).values_list("raw_data__typeTransaction", flat=True)
         for deal_type in rows.iterator():
             if deal_type in DEAL_TYPE_LABELS:
                 counts[deal_type] += 1
+        return dict(counts)
+
+    @cached_property
+    def subject_option_counts(self) -> dict[str, int]:
+        counts: Counter[str] = Counter()
+        rows = self._build_queryset(
+            apply_municipality_filter=True,
+            apply_deal_type_filter=True,
+            apply_subject_filter=False,
+        ).values_list("subject_ref__code", flat=True)
+        for subject_code in rows.iterator():
+            if subject_code:
+                counts[subject_code] += 1
         return dict(counts)
 
     def get_context_data(self, **kwargs):
@@ -827,6 +858,16 @@ class LotListView(LoginRequiredMixin, ListView):
             Region.objects.filter(is_active=True).order_by("sort_order", "name")
         )
         context["selected_region"] = self.selected_region
+        context["subject_options"] = [
+            {
+                "label": subject.name,
+                "value": subject.code,
+                "count": self.subject_option_counts.get(subject.code, 0),
+                "selected": subject.code in self.selected_subject_codes,
+            }
+            for subject in Subject.objects.filter(published=True).order_by("code", "name")
+        ]
+        context["selected_subjects"] = self.selected_subject_codes
         context["location_query"] = self.location_query
         context["show_municipality_filter"] = self.show_municipality_filter
         context["municipality_options"] = [
@@ -883,7 +924,11 @@ class LotListView(LoginRequiredMixin, ListView):
         )
         context["active_filter_count"] = sum(
             1 for param in active_filter_params if self.request.GET.get(param)
-        ) + len(self.selected_municipality_slugs) + (1 if self.is_deal_type_filter_active else 0) + (1 if current_tab != "all" else 0)
+        )
+        context["active_filter_count"] += len(self.selected_subject_codes)
+        context["active_filter_count"] += len(self.selected_municipality_slugs)
+        context["active_filter_count"] += 1 if self.is_deal_type_filter_active else 0
+        context["active_filter_count"] += 1 if current_tab != "all" else 0
         context["has_active_filters"] = context["active_filter_count"] > 0
         return context
 

@@ -207,6 +207,65 @@
                         {% endfor %}
                     </select>
                 </div>
+                {% if subject_options %}
+                    <div class="field field--compact municipality-filter" data-popup-filter data-popup-filter-name="subject">
+                        <label for="subject-trigger">Субъект РФ</label>
+                        <button
+                            id="subject-trigger"
+                            type="button"
+                            class="button button--ghost municipality-filter__trigger"
+                            aria-haspopup="dialog"
+                            aria-expanded="false"
+                            data-popup-trigger
+                        >
+                            Субъект РФ{% with selected_count=selected_subjects|length %}{% if selected_count %}: {{ selected_count }}{% endif %}{% endwith %}
+                        </button>
+                        <div class="municipality-filter__panel" data-popup-panel>
+                            <input
+                                type="search"
+                                class="municipality-filter__search"
+                                placeholder="Поиск субъекта"
+                                autocomplete="off"
+                                data-popup-search
+                            >
+                            <div class="municipality-filter__list" data-popup-list>
+                                {% for subject in subject_options %}
+                                    <label
+                                        class="municipality-filter__option"
+                                        data-popup-option
+                                        data-label="{{ subject.label }}"
+                                        data-value="{{ subject.value }}"
+                                        data-count="{{ subject.count }}"
+                                        data-selected="{% if subject.selected %}true{% else %}false{% endif %}"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            value="{{ subject.value }}"
+                                            {% if subject.selected %}checked{% endif %}
+                                            data-popup-checkbox
+                                        >
+                                        <span class="municipality-filter__option-body">
+                                            <span class="municipality-filter__label">{{ subject.label }}</span>
+                                            <span class="municipality-filter__count">({{ subject.count }})</span>
+                                        </span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                            <div class="municipality-filter__empty" data-popup-empty hidden>Ничего не найдено</div>
+                            <div class="municipality-filter__actions">
+                                <button type="button" class="button button--ghost" data-popup-reset>Сбросить</button>
+                                <button type="button" data-popup-apply>Применить</button>
+                            </div>
+                        </div>
+                        <div class="municipality-filter__hidden" data-popup-hidden>
+                            {% for subject in subject_options %}
+                                {% if subject.selected %}
+                                    <input type="hidden" name="subject" value="{{ subject.value }}">
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
                 {% if show_municipality_filter %}
                     <div class="field field--compact municipality-filter" data-municipality-filter>
                         <label for="municipality-trigger">Муниципалитет</label>
@@ -361,6 +420,9 @@
                     {% if selected_region %}<span class="badge">{{ selected_region.name }}</span>{% elif request.GET.region %}<span class="badge">{{ request.GET.region }}</span>{% endif %}
                     {% if show_municipality_filter and selected_municipality_slugs|length %}
                         <span class="badge">Муниципалитеты: {{ selected_municipality_slugs|length }}</span>
+                    {% endif %}
+                    {% if selected_subjects|length %}
+                        <span class="badge">Субъекты РФ: {{ selected_subjects|length }}</span>
                     {% endif %}
                     {% if selected_deal_types|length and selected_deal_types|length < deal_type_options|length %}
                         <span class="badge">Тип сделки: {{ selected_deal_types|length }}</span>
@@ -636,8 +698,16 @@
                 const hiddenContainer = root.querySelector("[data-popup-hidden], [data-municipality-hidden]");
                 const optionNodes = Array.from(root.querySelectorAll("[data-popup-option], [data-municipality-option]"));
                 const allValues = optionNodes.map((option) => option.dataset.value);
+                const urlSelection = new Set(new URLSearchParams(window.location.search).getAll(config.paramName));
                 const initialSelection = optionNodes
-                    .filter((option) => option.dataset.selected === "true")
+                    .filter((option) => {
+                        const checkbox = option.querySelector("[data-popup-checkbox], [data-municipality-checkbox]");
+                        return (
+                            option.dataset.selected === "true"
+                            || (checkbox && checkbox.checked)
+                            || urlSelection.has(option.dataset.value)
+                        );
+                    })
                     .map((option) => option.dataset.value);
                 const currentSelection = new Set(initialSelection);
                 let draftSelection = new Set(initialSelection);
@@ -792,6 +862,11 @@
                 });
 
                 updateTriggerLabel(currentSelection);
+                buildHiddenInputs(
+                    hiddenContainer,
+                    config.paramName,
+                    shouldOmitFromUrl(currentSelection) ? [] : Array.from(currentSelection)
+                );
                 renderOptions();
             };
 
@@ -813,6 +888,14 @@
                     }
                     return `Тип сделки: ${selectedCount}`;
                 },
+            });
+
+            setupPopupFilter(form.querySelector('[data-popup-filter-name="subject"]'), {
+                paramName: "subject",
+                omitWhenAllSelected: false,
+                emptyMeansAll: false,
+                searchDebounceMs: 250,
+                getLabel: (selectedCount) => selectedCount ? `Субъект РФ: ${selectedCount}` : "Субъект РФ",
             });
         }
 

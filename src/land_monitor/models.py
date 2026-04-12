@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Enum, ForeignKey, Index, Numeric, String, Text, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, Enum, ForeignKey, Index, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import TIMESTAMP, Double
@@ -147,6 +147,31 @@ class Listing(Base):
     alerts: Mapped[list["Alert"]] = relationship(back_populates="listing")
 
 
+class Subject(Base):
+    __tablename__ = "subjects"
+    __table_args__ = (
+        Index("uq_subjects_code", "code", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(10), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    okato: Mapped[str | None] = mapped_column(String(20))
+    published: Mapped[bool | None] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )
+
+    lots: Mapped[list["Lot"]] = relationship(back_populates="subject_ref")
+
+
 class Region(Base):
     __tablename__ = "regions"
     __table_args__ = (
@@ -191,6 +216,7 @@ class Lot(Base):
         Index("idx_lots_region", "region"),
         Index("idx_lots_region_id", "region_id"),
         Index("idx_lots_municipality_id", "municipality_id"),
+        Index("idx_lots_subject_id", "subject_id"),
         Index("idx_lots_notice_number", "notice_number"),
         Index("idx_lots_region_name", "region_name"),
         Index("idx_lots_price_min", "price_min"),
@@ -220,6 +246,10 @@ class Lot(Base):
     region: Mapped[str | None] = mapped_column(Text)
     region_name: Mapped[str | None] = mapped_column(Text)
     source_torgi_region_code: Mapped[str | None] = mapped_column(Text)
+    subject_id: Mapped[int | None] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     subject_rf_code: Mapped[str | None] = mapped_column(Text)
     district: Mapped[str | None] = mapped_column(Text)
     address: Mapped[str | None] = mapped_column(Text)
@@ -229,6 +259,8 @@ class Lot(Base):
     area_m2: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     category: Mapped[str | None] = mapped_column(Text)
     permitted_use: Mapped[str | None] = mapped_column(Text)
+    ownership_form_code: Mapped[str | None] = mapped_column(Text)
+    ownership_form_name: Mapped[str | None] = mapped_column(Text)
 
     price_min: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     price_fin: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
@@ -285,6 +317,7 @@ class Lot(Base):
     )
 
     region_ref: Mapped["Region | None"] = relationship(back_populates="lots")
+    subject_ref: Mapped["Subject | None"] = relationship(back_populates="lots")
     municipality_ref: Mapped["Municipality | None"] = relationship(back_populates="lots")
 
 
@@ -316,6 +349,42 @@ class Notice(Base):
     is_offline: Mapped[bool | None] = mapped_column(Boolean)
     raw_data: Mapped[dict | None] = mapped_column(JSONB)
     fetched_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+
+
+class OpendataNoticeVersion(Base):
+    __tablename__ = "opendata_notice_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "reg_num",
+            "document_type",
+            "publish_date",
+            "href",
+            name="uq_opendata_notice_versions_version",
+        ),
+        Index("idx_opendata_notice_versions_status", "status"),
+        Index("idx_opendata_notice_versions_reg_num", "reg_num"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reg_num: Mapped[str] = mapped_column(Text, nullable=False)
+    document_type: Mapped[str] = mapped_column(Text, nullable=False)
+    publish_date: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    source_date: Mapped[date] = mapped_column(Date, nullable=False)
+    href: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    downloaded_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    processed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )
 
 
 class UserLot(Base):

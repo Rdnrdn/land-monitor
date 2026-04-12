@@ -13,6 +13,23 @@ class UserLotStatus(models.TextChoices):
     ARCHIVE = "ARCHIVE", "ARCHIVE"
 
 
+class Subject(models.Model):
+    code = models.CharField(max_length=10, unique=True)
+    name = models.CharField(max_length=255)
+    okato = models.CharField(max_length=20, blank=True, null=True)
+    published = models.BooleanField(blank=True, null=True)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "subjects"
+        ordering = ("code",)
+
+    def __str__(self) -> str:
+        return f"{self.code} {self.name}"
+
+
 class Region(models.Model):
     name = models.CharField(max_length=255)
     slug = models.CharField(max_length=100)
@@ -66,6 +83,14 @@ class Lot(models.Model):
         blank=True,
         null=True,
     )
+    subject_ref = models.ForeignKey(
+        Subject,
+        models.DO_NOTHING,
+        db_column="subject_id",
+        related_name="lots",
+        blank=True,
+        null=True,
+    )
     municipality_ref = models.ForeignKey(
         Municipality,
         models.DO_NOTHING,
@@ -85,6 +110,8 @@ class Lot(models.Model):
     area_m2 = models.DecimalField(max_digits=14, decimal_places=2, blank=True, null=True)
     category = models.TextField(blank=True, null=True)
     permitted_use = models.TextField(blank=True, null=True)
+    ownership_form_code = models.TextField(blank=True, null=True)
+    ownership_form_name = models.TextField(blank=True, null=True)
     price_min = models.DecimalField(max_digits=14, decimal_places=2, blank=True, null=True)
     price_fin = models.DecimalField(max_digits=14, decimal_places=2, blank=True, null=True)
     deposit_amount = models.DecimalField(max_digits=14, decimal_places=2, blank=True, null=True)

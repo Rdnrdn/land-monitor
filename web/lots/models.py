@@ -161,6 +161,7 @@ class Lot(models.Model):
     auction_date = models.DateTimeField(blank=True, null=True)
     source_created_at = models.DateTimeField(blank=True, null=True)
     source_updated_at = models.DateTimeField(blank=True, null=True)
+    lotcard_enriched_at = models.DateTimeField(blank=True, null=True)
     price_bucket = models.TextField(blank=True, null=True)
     days_to_deadline = models.IntegerField(blank=True, null=True)
     is_price_null = models.BooleanField(blank=True, null=True)

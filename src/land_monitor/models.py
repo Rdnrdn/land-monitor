@@ -286,6 +286,7 @@ class Lot(Base):
 
     source_created_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
     source_updated_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    lotcard_enriched_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
 
     price_bucket: Mapped[str | None] = mapped_column(Text)
     days_to_deadline: Mapped[int | None] = mapped_column()

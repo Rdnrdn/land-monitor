@@ -221,6 +221,95 @@ def _version_key_values(item: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _version_identity(key_values: dict[str, Any]) -> tuple[str, str, str, str]:
+    return (
+        str(key_values["reg_num"]),
+        str(key_values["document_type"]),
+        key_values["publish_date"].isoformat(),
+        str(key_values["href"]),
+    )
+
+
+def _candidate_key_pairs(
+    candidates: list[dict[str, Any]],
+    errors: list[dict[str, Any]],
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for item in candidates:
+        key_values = _version_key_values(item)
+        if key_values is None:
+            errors.append(
+                {
+                    "stage": "ledger_key",
+                    "href": item.get("href"),
+                    "regNum": item.get("regNum"),
+                    "status": "invalid_version_key",
+                }
+            )
+            continue
+        pairs.append((item, key_values))
+    return pairs
+
+
+def _processed_version_identities(
+    db,
+    key_values_list: list[dict[str, Any]],
+) -> set[tuple[str, str, str, str]]:
+    reg_nums = sorted({str(key_values["reg_num"]) for key_values in key_values_list})
+    if not reg_nums:
+        return set()
+
+    processed: set[tuple[str, str, str, str]] = set()
+    chunk_size = 1000
+    for offset in range(0, len(reg_nums), chunk_size):
+        chunk = reg_nums[offset : offset + chunk_size]
+        rows = (
+            db.query(OpendataNoticeVersion)
+            .filter(
+                OpendataNoticeVersion.reg_num.in_(chunk),
+                OpendataNoticeVersion.status == "processed",
+            )
+            .all()
+        )
+        for row in rows:
+            processed.add(
+                (
+                    str(row.reg_num),
+                    str(row.document_type),
+                    row.publish_date.isoformat(),
+                    str(row.href),
+                )
+            )
+    return processed
+
+
+def _filter_backlog_pairs(
+    candidate_pairs: list[tuple[dict[str, Any], dict[str, Any]]],
+    processed_identities: set[tuple[str, str, str, str]],
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    return [
+        (item, key_values)
+        for item, key_values in candidate_pairs
+        if _version_identity(key_values) not in processed_identities
+    ]
+
+
+def _effective_backlog_pairs(
+    db,
+    candidates: list[dict[str, Any]],
+    errors: list[dict[str, Any]],
+) -> tuple[list[tuple[dict[str, Any], dict[str, Any]]], int, int, int]:
+    candidate_pairs = _candidate_key_pairs(candidates, errors)
+    processed_identities = _processed_version_identities(
+        db,
+        [key_values for _, key_values in candidate_pairs],
+    )
+    backlog_pairs = _filter_backlog_pairs(candidate_pairs, processed_identities)
+    hrefs_already_processed = len(candidate_pairs) - len(backlog_pairs)
+    invalid_version_keys = len(candidates) - len(candidate_pairs)
+    return backlog_pairs, len(candidate_pairs), hrefs_already_processed, invalid_version_keys
+
+
 def _get_or_create_ledger_entry(db, key_values: dict[str, Any], now: datetime) -> tuple[OpendataNoticeVersion, bool]:
     version = (
         db.query(OpendataNoticeVersion)
@@ -397,7 +486,23 @@ class Command(BaseCommand):
 
         candidates = list(candidates_by_regnum.values())
         candidates.sort(key=lambda item: (item.get("publishDate") or "", item.get("regNum") or ""))
-        selected_candidates = candidates[:max_hrefs] if max_hrefs > 0 else candidates
+
+        planning_db = SessionLocal()
+        try:
+            (
+                backlog_candidate_pairs,
+                hrefs_candidate_valid_versions,
+                hrefs_already_processed,
+                hrefs_invalid_version_key,
+            ) = _effective_backlog_pairs(planning_db, candidates, errors)
+        finally:
+            planning_db.close()
+
+        selected_candidate_pairs = (
+            backlog_candidate_pairs[:max_hrefs]
+            if max_hrefs > 0
+            else backlog_candidate_pairs
+        )
 
         href_downloaded = 0
         created = 0
@@ -409,19 +514,8 @@ class Command(BaseCommand):
         unique_versions_detected = 0
         processed_count = 0
 
-        for item in selected_candidates:
+        for item, key_values in selected_candidate_pairs:
             href = str(item["href"])
-            key_values = _version_key_values(item)
-            if key_values is None:
-                errors.append(
-                    {
-                        "stage": "ledger_key",
-                        "href": href,
-                        "regNum": item.get("regNum"),
-                        "status": "invalid_version_key",
-                    }
-                )
-                continue
 
             unique_versions_detected += 1
             db = SessionLocal()
@@ -588,7 +682,13 @@ class Command(BaseCommand):
             "notice_type_filtered": notice_type_filtered,
             "unique_regnums_selected": len(candidates),
             "max_hrefs": max_hrefs,
-            "hrefs_planned": len(selected_candidates),
+            "hrefs_candidate_total": len(candidates),
+            "hrefs_candidate_valid_versions": hrefs_candidate_valid_versions,
+            "hrefs_invalid_version_key": hrefs_invalid_version_key,
+            "hrefs_already_processed": hrefs_already_processed,
+            "hrefs_effective_backlog": len(backlog_candidate_pairs),
+            "hrefs_planned_for_batch": len(selected_candidate_pairs),
+            "hrefs_planned": len(selected_candidate_pairs),
             "unique_versions_detected": unique_versions_detected,
             "ledger_found": ledger_found,
             "ledger_created": ledger_created,
@@ -623,7 +723,13 @@ class Command(BaseCommand):
         self.stdout.write(f"subject_filtered={subject_filtered}")
         self.stdout.write(f"notice_type_filtered={notice_type_filtered}")
         self.stdout.write(f"unique_regnums_selected={len(candidates)}")
-        self.stdout.write(f"hrefs_planned={len(selected_candidates)}")
+        self.stdout.write(f"hrefs_candidate_total={len(candidates)}")
+        self.stdout.write(f"hrefs_candidate_valid_versions={hrefs_candidate_valid_versions}")
+        self.stdout.write(f"hrefs_invalid_version_key={hrefs_invalid_version_key}")
+        self.stdout.write(f"hrefs_already_processed={hrefs_already_processed}")
+        self.stdout.write(f"hrefs_effective_backlog={len(backlog_candidate_pairs)}")
+        self.stdout.write(f"hrefs_planned_for_batch={len(selected_candidate_pairs)}")
+        self.stdout.write(f"hrefs_planned={len(selected_candidate_pairs)}")
         self.stdout.write(f"unique_versions_detected={unique_versions_detected}")
         self.stdout.write(f"ledger_found={ledger_found}")
         self.stdout.write(f"ledger_created={ledger_created}")

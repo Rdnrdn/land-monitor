@@ -718,26 +718,10 @@ class NoticeListView(LoginRequiredMixin, ListView):
 
     @cached_property
     def subject_option_counts(self) -> dict[str, int]:
-        lots_sql = _notice_lots_jsonb_sql("n.raw_data")
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f"""
-                WITH notice_subjects AS (
-                    SELECT DISTINCT
-                        n.notice_number,
-                        lot_obj->'biddingObjectInfo'->'subjectRF'->>'code' AS subject_code
-                    FROM notices AS n
-                    CROSS JOIN LATERAL jsonb_array_elements({lots_sql}) AS lot_obj
-                    WHERE n.raw_data ? %s
-                )
-                SELECT subject_code, COUNT(*) AS notice_count
-                FROM notice_subjects
-                WHERE subject_code IS NOT NULL AND subject_code <> ''
-                GROUP BY subject_code
-                """,
-                ["opendata"],
-            )
-            return {code: count for code, count in cursor.fetchall()}
+        # Counting subjects from raw_data->opendata->notice->lots for every request
+        # forces a full JSONB scan on production-sized data. Keep the filter itself,
+        # but drop counts from the synchronous render path.
+        return {}
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -756,7 +740,7 @@ class NoticeListView(LoginRequiredMixin, ListView):
             {
                 "label": subject.name,
                 "value": subject.code,
-                "count": self.subject_option_counts.get(subject.code, 0),
+                "count": None,
                 "selected": subject.code in self.selected_subject_codes,
             }
             for subject in Subject.objects.filter(published=True).order_by("code", "name")

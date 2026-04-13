@@ -879,7 +879,15 @@ class LotListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(lot_status_external=status)
 
         if self.selected_region is not None:
-            queryset = queryset.filter(region_ref=self.selected_region)
+            region_code = (
+                MOSCOW_OBLAST_RF_CODE
+                if self.selected_region.slug == MOSCOW_OBLAST_SLUG
+                else str(self.selected_region.torgi_region_code)
+            )
+            queryset = queryset.filter(
+                Q(region_ref=self.selected_region)
+                | Q(source="opendata_notice", subject_rf_code=region_code)
+            )
 
         if apply_subject_filter and self.selected_subject_codes:
             queryset = queryset.filter(subject_ref__code__in=self.selected_subject_codes)

@@ -321,6 +321,7 @@ class Command(BaseCommand):
             raise CommandError("--limit-notices must be a positive integer.")
 
         stats: dict[str, Any] = {
+            "notices_scanned": 0,
             "notices_processed": 0,
             "lots_processed": 0,
             "created": 0,
@@ -328,6 +329,8 @@ class Command(BaseCommand):
             "skipped": 0,
             "matched_existing": 0,
             "newly_created": 0,
+            "skipped_non_zk_notices": 0,
+            "skipped_non_zk_lots": 0,
             "skipped_non_published": 0,
             "skipped_malformed": 0,
             "errors": 0,
@@ -352,7 +355,7 @@ class Command(BaseCommand):
             )
 
             for notice_row in query.yield_per(25):
-                stats["notices_processed"] += 1
+                stats["notices_scanned"] += 1
                 raw_data = _as_dict(notice_row.raw_data)
                 notice_payload = _opendata_notice_payload(raw_data)
                 lots_payload = notice_payload.get("lots")
@@ -362,6 +365,21 @@ class Command(BaseCommand):
                 source_meta = _notice_source_meta(raw_data)
                 notice_number = _notice_number(notice_row, notice_payload)
                 notice_bidd_type_code = _notice_bidd_type_code(notice_payload)
+                if notice_bidd_type_code != "ZK":
+                    stats["skipped_non_zk_notices"] += 1
+                    stats["skipped_non_zk_lots"] += len(lots_payload)
+                    if len(stats["problem_examples"]) < 20:
+                        stats["problem_examples"].append(
+                            {
+                                "notice_number": notice_number,
+                                "reason": "non_zk_notice_skipped",
+                                "biddTypeCode": notice_bidd_type_code,
+                                "lots_count": len(lots_payload),
+                            }
+                        )
+                    continue
+
+                stats["notices_processed"] += 1
                 notice_subset = _notice_subset(notice_payload, source_meta)
                 source_url = _notice_source_url(notice_payload, source_meta)
 
@@ -533,6 +551,7 @@ class Command(BaseCommand):
         report_path.write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
 
         for key in (
+            "notices_scanned",
             "notices_processed",
             "lots_processed",
             "created",
@@ -540,6 +559,8 @@ class Command(BaseCommand):
             "skipped",
             "matched_existing",
             "newly_created",
+            "skipped_non_zk_notices",
+            "skipped_non_zk_lots",
             "skipped_non_published",
             "skipped_malformed",
             "errors",

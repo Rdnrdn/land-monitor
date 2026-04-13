@@ -101,6 +101,18 @@ def _notice_lots_jsonb_sql(raw_data_expression: str = "raw_data") -> str:
     )
 
 
+def _lot_product_scope_q() -> Q:
+    return (
+        Q(source="opendata_notice", source_notice_bidd_type_code="ZK")
+        | ~Q(source="opendata_notice")
+        | Q(source__isnull=True)
+    )
+
+
+def _scoped_lot_queryset():
+    return Lot.objects.filter(_lot_product_scope_q())
+
+
 def _clean_distinct_values(queryset, field_name: str) -> list[str]:
     return list(
         queryset.exclude(**{f"{field_name}__isnull": True})
@@ -837,7 +849,12 @@ class LotListView(LoginRequiredMixin, ListView):
         apply_deal_type_filter: bool,
         apply_subject_filter: bool,
     ) -> Lot.objects.none().__class__:
-        queryset = Lot.objects.select_related("user_lot", "region_ref", "municipality_ref", "subject_ref")
+        queryset = _scoped_lot_queryset().select_related(
+            "user_lot",
+            "region_ref",
+            "municipality_ref",
+            "subject_ref",
+        )
 
         price_min = self.request.GET.get("price_min")
         if price_min:
@@ -1068,7 +1085,7 @@ class LotListView(LoginRequiredMixin, ListView):
         for lot in context["lots"]:
             lot.user_lot_state = _get_user_lot_state(lot)
 
-        base_queryset = Lot.objects.all()
+        base_queryset = _scoped_lot_queryset()
         current_tab = self.get_current_tab()
         current_ordering = self.request.GET.get("ordering", "-updated_at")
         page_obj = context["page_obj"]
@@ -1196,7 +1213,7 @@ class LotDetailView(LoginRequiredMixin, DetailView):
     model = Lot
     template_name = "lots/lot_detail.html"
     context_object_name = "lot"
-    queryset = Lot.objects.select_related("user_lot", "region_ref", "municipality_ref")
+    queryset = _scoped_lot_queryset().select_related("user_lot", "region_ref", "municipality_ref")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1228,7 +1245,7 @@ class LotDetailView(LoginRequiredMixin, DetailView):
 
 class LotQuickActionView(LoginRequiredMixin, View):
     def post(self, request: HttpRequest, pk: int) -> HttpResponseRedirect:
-        lot = get_object_or_404(Lot, pk=pk)
+        lot = get_object_or_404(_scoped_lot_queryset(), pk=pk)
         action = request.POST.get("action", "")
 
         if action == "set_status":

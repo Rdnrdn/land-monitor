@@ -5,6 +5,101 @@
 
 {% block extra_head %}
 <style>
+    .geo-tree {
+        display: grid;
+        gap: 14px;
+        margin-top: 4px;
+    }
+    .geo-tree__node {
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: rgba(248, 250, 252, 0.7);
+        overflow: hidden;
+    }
+    .geo-tree__node--leaf {
+        padding: 14px 16px;
+    }
+    .geo-tree__summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 14px 16px;
+    }
+    .geo-tree__summary::-webkit-details-marker {
+        display: none;
+    }
+    .geo-tree__summary::marker {
+        content: "";
+    }
+    .geo-tree__summary-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+    .geo-tree__summary-label {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        min-width: 0;
+        cursor: pointer;
+    }
+    .geo-tree__summary-label input,
+    .geo-tree__child input {
+        width: 16px;
+        min-height: 16px;
+        margin: 3px 0 0;
+        padding: 0;
+        accent-color: var(--accent);
+        flex: 0 0 auto;
+    }
+    .geo-tree__summary-text {
+        color: var(--text);
+        font-size: 0.98rem;
+        font-weight: 600;
+        line-height: 1.35;
+    }
+    .geo-tree__caret {
+        width: 10px;
+        height: 10px;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(45deg);
+        opacity: 0.55;
+        flex: 0 0 auto;
+        transition: transform 0.18s ease;
+        margin-top: 4px;
+    }
+    .geo-tree__node[open] .geo-tree__caret {
+        transform: rotate(225deg);
+    }
+    .geo-tree__children {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px 16px;
+        padding: 0 16px 16px;
+    }
+    .geo-tree__child {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        min-width: 0;
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(203, 213, 225, 0.7);
+        background: rgba(255, 255, 255, 0.86);
+        cursor: pointer;
+    }
+    .geo-tree__child span {
+        min-width: 0;
+        color: var(--text);
+        font-size: 0.93rem;
+        line-height: 1.35;
+    }
+    .geo-tree__hint {
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.45;
+    }
     .municipality-filter {
         position: relative;
     }
@@ -133,6 +228,9 @@
         display: none;
     }
     @media (max-width: 720px) {
+        .geo-tree__children {
+            grid-template-columns: 1fr;
+        }
         .municipality-filter__panel {
             width: min(100vw - 40px, 360px);
         }
@@ -207,124 +305,8 @@
                         {% endfor %}
                     </select>
                 </div>
-                {% if subject_options %}
-                    <div class="field field--compact municipality-filter" data-popup-filter data-popup-filter-name="subject">
-                        <label for="subject-trigger">Субъект РФ</label>
-                        <button
-                            id="subject-trigger"
-                            type="button"
-                            class="button button--ghost municipality-filter__trigger"
-                            aria-haspopup="dialog"
-                            aria-expanded="false"
-                            data-popup-trigger
-                        >
-                            Субъект РФ{% with selected_count=selected_subjects|length %}{% if selected_count %}: {{ selected_count }}{% endif %}{% endwith %}
-                        </button>
-                        <div class="municipality-filter__panel" data-popup-panel>
-                            <input
-                                type="search"
-                                class="municipality-filter__search"
-                                placeholder="Поиск субъекта"
-                                autocomplete="off"
-                                data-popup-search
-                            >
-                            <div class="municipality-filter__list" data-popup-list>
-                                {% for subject in subject_options %}
-                                    <label
-                                        class="municipality-filter__option"
-                                        data-popup-option
-                                        data-label="{{ subject.label }}"
-                                        data-value="{{ subject.value }}"
-                                        data-count="{{ subject.count }}"
-                                        data-selected="{% if subject.selected %}true{% else %}false{% endif %}"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            value="{{ subject.value }}"
-                                            {% if subject.selected %}checked{% endif %}
-                                            data-popup-checkbox
-                                        >
-                                        <span class="municipality-filter__option-body">
-                                            <span class="municipality-filter__label">{{ subject.label }}</span>
-                                            <span class="municipality-filter__count">({{ subject.count }})</span>
-                                        </span>
-                                    </label>
-                                {% endfor %}
-                            </div>
-                            <div class="municipality-filter__empty" data-popup-empty hidden>Ничего не найдено</div>
-                            <div class="municipality-filter__actions">
-                                <button type="button" class="button button--ghost" data-popup-reset>Сбросить</button>
-                                <button type="button" data-popup-apply>Применить</button>
-                            </div>
-                        </div>
-                        <div class="municipality-filter__hidden" data-popup-hidden>
-                            {% for subject in subject_options %}
-                                {% if subject.selected %}
-                                    <input type="hidden" name="subject" value="{{ subject.value }}">
-                                {% endif %}
-                            {% endfor %}
-                        </div>
-                    </div>
-                {% endif %}
-                {% if show_municipality_filter %}
-                    <div class="field field--compact municipality-filter" data-municipality-filter>
-                        <label for="municipality-trigger">Муниципалитет</label>
-                        <button
-                            id="municipality-trigger"
-                            type="button"
-                            class="button button--ghost municipality-filter__trigger"
-                            aria-haspopup="dialog"
-                            aria-expanded="false"
-                            data-municipality-trigger
-                        >
-                            Муниципалитет{% with selected_count=selected_municipality_slugs|length %}{% if selected_count %}: {{ selected_count }}{% endif %}{% endwith %}
-                        </button>
-                        <div class="municipality-filter__panel" data-municipality-panel>
-                            <input
-                                type="search"
-                                class="municipality-filter__search"
-                                placeholder="Поиск муниципалитета"
-                                autocomplete="off"
-                                data-municipality-search
-                            >
-                            <div class="municipality-filter__list" data-municipality-list>
-                                {% for municipality in municipality_options %}
-                                    <label
-                                        class="municipality-filter__option"
-                                        data-municipality-option
-                                        data-label="{{ municipality.label }}"
-                                        data-value="{{ municipality.value }}"
-                                        data-count="{{ municipality.count }}"
-                                        data-selected="{% if municipality.selected %}true{% else %}false{% endif %}"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            value="{{ municipality.value }}"
-                                            {% if municipality.selected %}checked{% endif %}
-                                            data-municipality-checkbox
-                                        >
-                                        <span class="municipality-filter__option-body">
-                                            <span class="municipality-filter__label">{{ municipality.label }}</span>
-                                            <span class="municipality-filter__count">({{ municipality.count }})</span>
-                                        </span>
-                                    </label>
-                                {% endfor %}
-                            </div>
-                            <div class="municipality-filter__empty" data-municipality-empty hidden>Ничего не найдено</div>
-                            <div class="municipality-filter__actions">
-                                <button type="button" class="button button--ghost" data-municipality-reset>Сбросить</button>
-                                <button type="button" data-municipality-apply>Применить</button>
-                            </div>
-                        </div>
-                        <div class="municipality-filter__hidden" data-municipality-hidden>
-                            {% for municipality in municipality_options %}
-                                {% if municipality.selected %}
-                                    <input type="hidden" name="municipality" value="{{ municipality.value }}">
-                                {% endif %}
-                            {% endfor %}
-                        </div>
-                    </div>
-                {% endif %}
+                {% comment %} subject filter hidden in UI {% endcomment %}
+                {% comment %} legacy municipality filter hidden in favor of fias tree {% endcomment %}
                 <div class="field field--compact municipality-filter municipality-filter--compact" data-popup-filter data-popup-filter-name="deal_type">
                     <label for="deal-type-trigger">Тип сделки</label>
                     <button
@@ -401,10 +383,7 @@
                     <label for="id_price_max">Цена до</label>
                     <input id="id_price_max" type="number" step="0.01" name="price_max" value="{{ request.GET.price_max }}" placeholder="Например, 5000000" data-debounce-submit>
                 </div>
-                <div class="field field--compact">
-                    <label for="id_location">Местоположение</label>
-                    <input id="id_location" type="text" name="location" value="{{ location_query }}" placeholder="Например, Кукино" data-debounce-submit>
-                </div>
+                {% comment %} legacy location filter hidden in favor of fias tree {% endcomment %}
                 <div class="field field--compact">
                     <label for="id_ordering_mirror">Сортировка</label>
                     <select id="id_ordering_mirror" name="ordering" data-auto-submit>
@@ -415,29 +394,84 @@
                 </div>
             </div>
 
+            {% if show_fias_filter and mo_fias_tree %}
+                <div class="stack" style="margin-top: 20px;">
+                    <div>
+                        <h4 style="margin: 0 0 6px;">География (Московская область)</h4>
+                        <div class="geo-tree__hint">Муниципалитеты верхнего уровня и вложенные города или деревни. Фильтр работает через GET и сохраняет текущее состояние после reload.</div>
+                    </div>
+                    <div class="geo-tree">
+                        {% for node in mo_fias_tree %}
+                            {% if node.children %}
+                                <details class="geo-tree__node" open>
+                                    <summary class="geo-tree__summary">
+                                        <div class="geo-tree__summary-content">
+                                            <label class="geo-tree__summary-label">
+                                                <input
+                                                    type="checkbox"
+                                                    name="fias_level_3"
+                                                    value="{{ node.guid }}"
+                                                    {% if node.guid in selected_fias_level_3_guids %}checked{% endif %}
+                                                >
+                                                <span class="geo-tree__summary-text">{{ node.name }}</span>
+                                            </label>
+                                            <span class="geo-tree__caret" aria-hidden="true"></span>
+                                        </div>
+                                    </summary>
+                                    <div class="geo-tree__children">
+                                        {% for child in node.children %}
+                                            <label class="geo-tree__child">
+                                                <input
+                                                    type="checkbox"
+                                                    name="fias_level_{{ child.level }}"
+                                                    value="{{ child.guid }}"
+                                                    {% if child.level == 5 and child.guid in selected_fias_level_5_guids %}checked{% endif %}
+                                                    {% if child.level == 6 and child.guid in selected_fias_level_6_guids %}checked{% endif %}
+                                                >
+                                                <span>{{ child.name }}</span>
+                                            </label>
+                                        {% endfor %}
+                                    </div>
+                                </details>
+                            {% else %}
+                                <div class="geo-tree__node geo-tree__node--leaf">
+                                    <label class="geo-tree__summary-label">
+                                        <input
+                                            type="checkbox"
+                                            name="fias_level_3"
+                                            value="{{ node.guid }}"
+                                            {% if node.guid in selected_fias_level_3_guids %}checked{% endif %}
+                                        >
+                                        <span class="geo-tree__summary-text">{{ node.name }}</span>
+                                    </label>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% elif selected_region and selected_region.slug != "moskovskaya-oblast" %}
+                <div class="filters__hint">Детальная география сейчас доступна только для Московской области.</div>
+            {% endif %}
+
             <div class="filters__footer">
                 <div class="toolbar__meta">
                     {% if selected_region %}<span class="badge">{{ selected_region.name }}</span>{% elif request.GET.region %}<span class="badge">{{ request.GET.region }}</span>{% endif %}
-                    {% if show_municipality_filter and selected_municipality_slugs|length %}
-                        <span class="badge">Муниципалитеты: {{ selected_municipality_slugs|length }}</span>
-                    {% endif %}
-                    {% if selected_subjects|length %}
-                        <span class="badge">Субъекты РФ: {{ selected_subjects|length }}</span>
+                    {% if selected_fias_level_3_guids or selected_fias_level_5_guids or selected_fias_level_6_guids %}
+                        <span class="badge">География МО</span>
                     {% endif %}
                     {% if selected_deal_types|length and selected_deal_types|length < deal_type_options|length %}
                         <span class="badge">Тип сделки: {{ selected_deal_types|length }}</span>
                     {% endif %}
                     {% if request.GET.status %}<span class="badge">{{ request.GET.status }}</span>{% endif %}
                     {% if request.GET.price_min or request.GET.price_max %}<span class="badge">Цена</span>{% endif %}
-                    {% if location_query %}<span class="badge">Местоположение: {{ location_query }}</span>{% endif %}
                 </div>
                 <div class="actions">
                     <button type="submit">Применить</button>
                     <a class="button button--ghost" href="?tab={{ current_tab }}">Сбросить фильтры</a>
                 </div>
             </div>
-            {% if show_municipality_filter %}
-                <div class="filters__hint">Муниципалитеты доступны только для Московской области. Можно выбрать несколько значений.</div>
+            {% if show_fias_filter and mo_fias_tree %}
+                <div class="filters__hint">Старые географические поля в интерфейсе скрыты. Для Московской области используйте дерево FIAS level 3 → level 5/6.</div>
             {% endif %}
         </form>
     </div>
@@ -688,20 +722,20 @@
                     return;
                 }
 
-                const trigger = root.querySelector("[data-popup-trigger], [data-municipality-trigger]");
-                const panel = root.querySelector("[data-popup-panel], [data-municipality-panel]");
-                const searchInput = root.querySelector("[data-popup-search], [data-municipality-search]");
-                const list = root.querySelector("[data-popup-list], [data-municipality-list]");
-                const emptyState = root.querySelector("[data-popup-empty], [data-municipality-empty]");
-                const applyButton = root.querySelector("[data-popup-apply], [data-municipality-apply]");
-                const resetButton = root.querySelector("[data-popup-reset], [data-municipality-reset]");
-                const hiddenContainer = root.querySelector("[data-popup-hidden], [data-municipality-hidden]");
-                const optionNodes = Array.from(root.querySelectorAll("[data-popup-option], [data-municipality-option]"));
+                const trigger = root.querySelector("[data-popup-trigger]");
+                const panel = root.querySelector("[data-popup-panel]");
+                const searchInput = root.querySelector("[data-popup-search]");
+                const list = root.querySelector("[data-popup-list]");
+                const emptyState = root.querySelector("[data-popup-empty]");
+                const applyButton = root.querySelector("[data-popup-apply]");
+                const resetButton = root.querySelector("[data-popup-reset]");
+                const hiddenContainer = root.querySelector("[data-popup-hidden]");
+                const optionNodes = Array.from(root.querySelectorAll("[data-popup-option]"));
                 const allValues = optionNodes.map((option) => option.dataset.value);
                 const urlSelection = new Set(new URLSearchParams(window.location.search).getAll(config.paramName));
                 const initialSelection = optionNodes
                     .filter((option) => {
-                        const checkbox = option.querySelector("[data-popup-checkbox], [data-municipality-checkbox]");
+                        const checkbox = option.querySelector("[data-popup-checkbox]");
                         return (
                             option.dataset.selected === "true"
                             || (checkbox && checkbox.checked)
@@ -758,7 +792,7 @@
                     let visibleCount = 0;
 
                     optionNodes.forEach((option) => {
-                        const checkbox = option.querySelector("[data-popup-checkbox], [data-municipality-checkbox]");
+                        const checkbox = option.querySelector("[data-popup-checkbox]");
                         const isSelected = draftSelection.has(option.dataset.value);
                         const label = (option.dataset.label || "").toLocaleLowerCase("ru-RU");
                         const matches = !query || label.includes(query);
@@ -813,7 +847,7 @@
                     }
                 });
 
-                root.querySelectorAll("[data-popup-checkbox], [data-municipality-checkbox]").forEach((checkbox) => {
+                root.querySelectorAll("[data-popup-checkbox]").forEach((checkbox) => {
                     checkbox.addEventListener("change", () => {
                         if (checkbox.checked) {
                             draftSelection.add(checkbox.value);
@@ -870,14 +904,6 @@
                 renderOptions();
             };
 
-            setupPopupFilter(form.querySelector("[data-municipality-filter]"), {
-                paramName: "municipality",
-                omitWhenAllSelected: false,
-                emptyMeansAll: false,
-                searchDebounceMs: 250,
-                getLabel: (selectedCount) => selectedCount ? `Муниципалитет: ${selectedCount}` : "Муниципалитет",
-            });
-
             setupPopupFilter(form.querySelector('[data-popup-filter-name="deal_type"]'), {
                 paramName: "deal_type",
                 omitWhenAllSelected: true,
@@ -890,13 +916,6 @@
                 },
             });
 
-            setupPopupFilter(form.querySelector('[data-popup-filter-name="subject"]'), {
-                paramName: "subject",
-                omitWhenAllSelected: false,
-                emptyMeansAll: false,
-                searchDebounceMs: 250,
-                getLabel: (selectedCount) => selectedCount ? `Субъект РФ: ${selectedCount}` : "Субъект РФ",
-            });
         }
 
         document.querySelectorAll("form[data-preserve-scroll]").forEach((quickActionForm) => {

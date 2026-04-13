@@ -60,6 +60,7 @@ STATUS_CHOICES = tuple(UserLotStatus.choices)
 VALID_USER_STATUSES = {choice for choice, _ in STATUS_CHOICES}
 DEFAULT_PER_PAGE = 25
 PER_PAGE_OPTIONS = (25, 50, 100)
+MOSCOW_OBLAST_RF_CODE = "50"
 DEAL_TYPE_LABELS = {
     "sale": "Продажа",
     "rent": "Аренда",
@@ -111,6 +112,14 @@ def _lot_product_scope_q() -> Q:
 
 def _scoped_lot_queryset():
     return Lot.objects.filter(_lot_product_scope_q())
+
+
+def _mo_opendata_zk_queryset():
+    return Lot.objects.filter(
+        source="opendata_notice",
+        source_notice_bidd_type_code="ZK",
+        subject_rf_code=MOSCOW_OBLAST_RF_CODE,
+    )
 
 
 def _clean_distinct_values(queryset, field_name: str) -> list[str]:
@@ -848,6 +857,7 @@ class LotListView(LoginRequiredMixin, ListView):
         apply_municipality_filter: bool,
         apply_deal_type_filter: bool,
         apply_subject_filter: bool,
+        apply_fias_filter: bool,
     ) -> Lot.objects.none().__class__:
         queryset = _scoped_lot_queryset().select_related(
             "user_lot",
@@ -879,6 +889,18 @@ class LotListView(LoginRequiredMixin, ListView):
                 Q(municipality_ref__normalized_name__in=self.selected_municipality_aliases)
                 | Q(municipality_name__in=self.selected_municipality_raw_aliases)
             )
+
+        if apply_fias_filter and self.show_fias_filter:
+            precise_q = Q()
+            if self.selected_fias_level_5_guids:
+                precise_q |= Q(fias_level_5_guid__in=self.selected_fias_level_5_guids)
+            if self.selected_fias_level_6_guids:
+                precise_q |= Q(fias_level_6_guid__in=self.selected_fias_level_6_guids)
+
+            if precise_q:
+                queryset = queryset.filter(precise_q)
+            elif self.selected_fias_level_3_guids:
+                queryset = queryset.filter(fias_level_3_guid__in=self.selected_fias_level_3_guids)
 
         if apply_deal_type_filter and self.is_deal_type_filter_active:
             queryset = queryset.filter(raw_data__typeTransaction__in=self.selected_deal_types)
@@ -918,6 +940,7 @@ class LotListView(LoginRequiredMixin, ListView):
             apply_municipality_filter=True,
             apply_deal_type_filter=True,
             apply_subject_filter=True,
+            apply_fias_filter=True,
         ).order_by(
             self.get_ordering_value(),
             "-id",
@@ -958,6 +981,131 @@ class LotListView(LoginRequiredMixin, ListView):
             self.selected_region is not None
             and self.selected_region.slug == MOSCOW_OBLAST_SLUG
         )
+
+    @cached_property
+    def show_fias_filter(self) -> bool:
+        return self.show_municipality_filter
+
+    @cached_property
+    def mo_fias_level_3_options(self) -> list[dict[str, str]]:
+        if not self.show_fias_filter:
+            return []
+        rows = (
+            _mo_opendata_zk_queryset()
+            .exclude(fias_level_3_guid__isnull=True)
+            .exclude(fias_level_3_guid="")
+            .exclude(fias_level_3_name__isnull=True)
+            .exclude(fias_level_3_name="")
+            .order_by("fias_level_3_name", "fias_level_3_guid")
+            .values_list("fias_level_3_guid", "fias_level_3_name")
+            .distinct()
+        )
+        return [{"guid": guid, "name": name} for guid, name in rows]
+
+    def _selected_fias_guids(self, param_name: str, valid_guids: set[str]) -> list[str]:
+        if not self.show_fias_filter:
+            return []
+        values: list[str] = []
+        for value in self.request.GET.getlist(param_name):
+            cleaned = (value or "").strip()
+            if not cleaned or cleaned not in valid_guids or cleaned in values:
+                continue
+            values.append(cleaned)
+        return values
+
+    @cached_property
+    def selected_fias_level_3_guids(self) -> list[str]:
+        valid_guids = {option["guid"] for option in self.mo_fias_level_3_options}
+        return self._selected_fias_guids("fias_level_3", valid_guids)
+
+    @cached_property
+    def mo_fias_tree(self) -> list[dict[str, object]]:
+        if not self.show_fias_filter:
+            return []
+
+        rows = (
+            _mo_opendata_zk_queryset()
+            .exclude(fias_level_3_guid__isnull=True)
+            .exclude(fias_level_3_guid="")
+            .exclude(fias_level_3_name__isnull=True)
+            .exclude(fias_level_3_name="")
+            .order_by(
+                "fias_level_3_name",
+                "fias_level_5_name",
+                "fias_level_6_name",
+                "fias_level_5_guid",
+                "fias_level_6_guid",
+            )
+            .values_list(
+                "fias_level_3_guid",
+                "fias_level_3_name",
+                "fias_level_5_guid",
+                "fias_level_5_name",
+                "fias_level_6_guid",
+                "fias_level_6_name",
+            )
+            .distinct()
+        )
+
+        tree_by_guid: dict[str, dict[str, object]] = {}
+        for level_3_guid, level_3_name, level_5_guid, level_5_name, level_6_guid, level_6_name in rows:
+            node = tree_by_guid.setdefault(
+                level_3_guid,
+                {
+                    "guid": level_3_guid,
+                    "name": level_3_name,
+                    "children": [],
+                    "_child_keys": set(),
+                },
+            )
+
+            for child_guid, child_name, level_code in (
+                (level_5_guid, level_5_name, 5),
+                (level_6_guid, level_6_name, 6),
+            ):
+                if not child_guid or not child_name:
+                    continue
+                child_key = (level_code, child_guid)
+                if child_key in node["_child_keys"]:
+                    continue
+                node["_child_keys"].add(child_key)
+                node["children"].append(
+                    {
+                        "guid": child_guid,
+                        "name": child_name,
+                        "level": level_code,
+                    }
+                )
+
+        tree: list[dict[str, object]] = []
+        for node in tree_by_guid.values():
+            node["children"].sort(key=lambda item: (item["name"], item["guid"]))
+            node.pop("_child_keys", None)
+            tree.append(node)
+        tree.sort(key=lambda item: (item["name"], item["guid"]))
+        return tree
+
+    @cached_property
+    def _mo_fias_child_guid_sets(self) -> tuple[set[str], set[str]]:
+        level_5_guids: set[str] = set()
+        level_6_guids: set[str] = set()
+        for node in self.mo_fias_tree:
+            for child in node["children"]:
+                if child["level"] == 5:
+                    level_5_guids.add(child["guid"])
+                elif child["level"] == 6:
+                    level_6_guids.add(child["guid"])
+        return level_5_guids, level_6_guids
+
+    @cached_property
+    def selected_fias_level_5_guids(self) -> list[str]:
+        level_5_guids, _ = self._mo_fias_child_guid_sets
+        return self._selected_fias_guids("fias_level_5", level_5_guids)
+
+    @cached_property
+    def selected_fias_level_6_guids(self) -> list[str]:
+        _, level_6_guids = self._mo_fias_child_guid_sets
+        return self._selected_fias_guids("fias_level_6", level_6_guids)
 
     @cached_property
     def selected_municipality_slugs(self) -> list[str]:
@@ -1032,6 +1180,7 @@ class LotListView(LoginRequiredMixin, ListView):
             apply_municipality_filter=False,
             apply_deal_type_filter=True,
             apply_subject_filter=True,
+            apply_fias_filter=True,
         ).values_list(
             "municipality_ref__normalized_name",
             "municipality_name",
@@ -1061,6 +1210,7 @@ class LotListView(LoginRequiredMixin, ListView):
             apply_municipality_filter=True,
             apply_deal_type_filter=False,
             apply_subject_filter=True,
+            apply_fias_filter=True,
         ).values_list("raw_data__typeTransaction", flat=True)
         for deal_type in rows.iterator():
             if deal_type in DEAL_TYPE_LABELS:
@@ -1074,6 +1224,7 @@ class LotListView(LoginRequiredMixin, ListView):
             apply_municipality_filter=True,
             apply_deal_type_filter=True,
             apply_subject_filter=False,
+            apply_fias_filter=True,
         ).values_list("subject_ref__code", flat=True)
         for subject_code in rows.iterator():
             if subject_code:
@@ -1146,6 +1297,12 @@ class LotListView(LoginRequiredMixin, ListView):
         context["selected_subjects"] = self.selected_subject_codes
         context["location_query"] = self.location_query
         context["show_municipality_filter"] = self.show_municipality_filter
+        context["show_fias_filter"] = self.show_fias_filter
+        context["mo_fias_level_3_options"] = self.mo_fias_level_3_options
+        context["mo_fias_tree"] = self.mo_fias_tree
+        context["selected_fias_level_3_guids"] = self.selected_fias_level_3_guids
+        context["selected_fias_level_5_guids"] = self.selected_fias_level_5_guids
+        context["selected_fias_level_6_guids"] = self.selected_fias_level_6_guids
         context["municipality_options"] = [
             {
                 "label": option.label,
@@ -1203,6 +1360,9 @@ class LotListView(LoginRequiredMixin, ListView):
         )
         context["active_filter_count"] += len(self.selected_subject_codes)
         context["active_filter_count"] += len(self.selected_municipality_slugs)
+        context["active_filter_count"] += len(self.selected_fias_level_3_guids)
+        context["active_filter_count"] += len(self.selected_fias_level_5_guids)
+        context["active_filter_count"] += len(self.selected_fias_level_6_guids)
         context["active_filter_count"] += 1 if self.is_deal_type_filter_active else 0
         context["active_filter_count"] += 1 if current_tab != "all" else 0
         context["has_active_filters"] = context["active_filter_count"] > 0

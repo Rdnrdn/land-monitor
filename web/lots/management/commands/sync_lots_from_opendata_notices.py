@@ -125,11 +125,17 @@ def _notice_subset(
         "noticeNumber": common_info.get("noticeNumber") or source_meta.get("regNum"),
         "publishDate": common_info.get("publishDate") or source_meta.get("publishDate"),
         "publicNoticeUrl": common_info.get("href"),
+        "biddType": common_info.get("biddType"),
         "biddConditions": notice_payload.get("biddConditions"),
         "bidderOrg": notice_payload.get("bidderOrg"),
         "rightHolderInfo": notice_payload.get("rightHolderInfo"),
         "opendata_meta": source_meta,
     }
+
+
+def _notice_bidd_type_code(notice_payload: dict[str, Any]) -> str | None:
+    common_info = _as_dict(notice_payload.get("commonInfo"))
+    return _dict_value(common_info.get("biddType"), "code")
 
 
 def _lot_snapshot(lot_payload: dict[str, Any]) -> dict[str, Any]:
@@ -195,6 +201,7 @@ def _mapped_values(
     lot_snapshot: dict[str, Any],
     *,
     subjects_by_code: dict[str, Subject],
+    source_notice_bidd_type_code: str | None,
 ) -> dict[str, Any]:
     subject = _as_dict(lot_snapshot.get("subjectRF"))
     category = _as_dict(lot_snapshot.get("category"))
@@ -213,6 +220,7 @@ def _mapped_values(
         "ownership_form_code": _dict_value(ownership_form, "code"),
         "ownership_form_name": _dict_value(ownership_form, "name"),
         "lot_status_external": _clean_text(lot_snapshot.get("lotStatus")),
+        "source_notice_bidd_type_code": source_notice_bidd_type_code,
         "cadastre_number": _value_to_text(_characteristic_value(characteristics, CADASTRAL_NUMBER_CODES)),
         "area_m2": _value_to_decimal(_characteristic_value(characteristics, AREA_CODES)),
         "permitted_use": _value_to_text(_characteristic_value(characteristics, PERMITTED_USE_CODES)),
@@ -231,6 +239,7 @@ def _apply_mapped_values(lot: Lot, mapped_values: dict[str, Any]) -> set[str]:
         "ownership_form_code",
         "ownership_form_name",
         "lot_status_external",
+        "source_notice_bidd_type_code",
         "cadastre_number",
         "permitted_use",
     ):
@@ -272,6 +281,7 @@ def _new_lot(
         ownership_form_code=mapped_values.get("ownership_form_code"),
         ownership_form_name=mapped_values.get("ownership_form_name"),
         lot_status_external=mapped_values.get("lot_status_external"),
+        source_notice_bidd_type_code=mapped_values.get("source_notice_bidd_type_code"),
         raw_data=raw_data,
     )
 
@@ -351,6 +361,7 @@ class Command(BaseCommand):
 
                 source_meta = _notice_source_meta(raw_data)
                 notice_number = _notice_number(notice_row, notice_payload)
+                notice_bidd_type_code = _notice_bidd_type_code(notice_payload)
                 notice_subset = _notice_subset(notice_payload, source_meta)
                 source_url = _notice_source_url(notice_payload, source_meta)
 
@@ -381,6 +392,7 @@ class Command(BaseCommand):
                         mapped_values = _mapped_values(
                             lot_snapshot,
                             subjects_by_code=subjects_by_code,
+                            source_notice_bidd_type_code=notice_bidd_type_code,
                         )
                         lot_status = _clean_text(lot_snapshot.get("lotStatus"))
                         raw_snapshot = _merge_raw_data(

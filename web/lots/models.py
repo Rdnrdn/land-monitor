@@ -154,6 +154,7 @@ class Lot(models.Model):
     organizer_inn = models.TextField(blank=True, null=True)
     organizer_kpp = models.TextField(blank=True, null=True)
     lot_status_external = models.TextField(blank=True, null=True)
+    source_notice_bidd_type_code = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(blank=True, null=True)
     is_finished = models.BooleanField(blank=True, null=True)
     application_start_date = models.DateTimeField(blank=True, null=True)

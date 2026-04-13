@@ -275,6 +275,7 @@ class Lot(Base):
     organizer_kpp: Mapped[str | None] = mapped_column(Text)
 
     lot_status_external: Mapped[str | None] = mapped_column(Text)
+    source_notice_bidd_type_code: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool | None] = mapped_column(Boolean)
     is_finished: Mapped[bool | None] = mapped_column(Boolean)
 

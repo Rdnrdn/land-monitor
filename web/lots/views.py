@@ -915,7 +915,8 @@ class LotListView(LoginRequiredMixin, ListView):
 
         if self.location_query:
             queryset = queryset.filter(
-                Q(raw_data__lotcard__estateAddress__icontains=self.location_query)
+                Q(title__icontains=self.location_query)
+                | Q(raw_data__lotcard__estateAddress__icontains=self.location_query)
                 | Q(address__icontains=self.location_query)
                 | Q(district__icontains=self.location_query)
                 | Q(raw_data__estateAddress__icontains=self.location_query)

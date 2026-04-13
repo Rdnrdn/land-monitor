@@ -10,6 +10,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from land_monitor.db import SessionLocal
 from land_monitor.models import Lot, Notice, Subject
+from lots.opendata_fias import extract_fias_levels
 
 
 SOURCE = "opendata_notice"
@@ -208,6 +209,7 @@ def _mapped_values(
     ownership_form = _as_dict(lot_snapshot.get("ownershipForms"))
     characteristics = lot_snapshot.get("characteristics")
     subject_code = _dict_value(subject, "code")
+    fias_levels = extract_fias_levels(lot_snapshot.get("estateAddressFIAS"))
 
     return {
         "title": _clean_text(lot_snapshot.get("lotName")),
@@ -224,6 +226,7 @@ def _mapped_values(
         "cadastre_number": _value_to_text(_characteristic_value(characteristics, CADASTRAL_NUMBER_CODES)),
         "area_m2": _value_to_decimal(_characteristic_value(characteristics, AREA_CODES)),
         "permitted_use": _value_to_text(_characteristic_value(characteristics, PERMITTED_USE_CODES)),
+        **fias_levels,
     }
 
 
@@ -240,6 +243,12 @@ def _apply_mapped_values(lot: Lot, mapped_values: dict[str, Any]) -> set[str]:
         "ownership_form_name",
         "lot_status_external",
         "source_notice_bidd_type_code",
+        "fias_level_3_guid",
+        "fias_level_3_name",
+        "fias_level_5_guid",
+        "fias_level_5_name",
+        "fias_level_6_guid",
+        "fias_level_6_name",
         "cadastre_number",
         "permitted_use",
     ):
@@ -282,6 +291,12 @@ def _new_lot(
         ownership_form_name=mapped_values.get("ownership_form_name"),
         lot_status_external=mapped_values.get("lot_status_external"),
         source_notice_bidd_type_code=mapped_values.get("source_notice_bidd_type_code"),
+        fias_level_3_guid=mapped_values.get("fias_level_3_guid"),
+        fias_level_3_name=mapped_values.get("fias_level_3_name"),
+        fias_level_5_guid=mapped_values.get("fias_level_5_guid"),
+        fias_level_5_name=mapped_values.get("fias_level_5_name"),
+        fias_level_6_guid=mapped_values.get("fias_level_6_guid"),
+        fias_level_6_name=mapped_values.get("fias_level_6_name"),
         raw_data=raw_data,
     )
 

@@ -276,6 +276,12 @@ class Lot(Base):
 
     lot_status_external: Mapped[str | None] = mapped_column(Text)
     source_notice_bidd_type_code: Mapped[str | None] = mapped_column(Text)
+    fias_level_3_guid: Mapped[str | None] = mapped_column(Text)
+    fias_level_3_name: Mapped[str | None] = mapped_column(Text)
+    fias_level_5_guid: Mapped[str | None] = mapped_column(Text)
+    fias_level_5_name: Mapped[str | None] = mapped_column(Text)
+    fias_level_6_guid: Mapped[str | None] = mapped_column(Text)
+    fias_level_6_name: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool | None] = mapped_column(Boolean)
     is_finished: Mapped[bool | None] = mapped_column(Boolean)
 

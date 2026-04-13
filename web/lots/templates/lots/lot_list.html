@@ -74,7 +74,7 @@
     }
     .geo-tree__children {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 6px 16px;
         padding: 0 16px 16px;
     }
@@ -229,13 +229,18 @@
     }
     @media (max-width: 720px) {
         .geo-tree__children {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
         .municipality-filter__panel {
             width: min(100vw - 40px, 360px);
         }
         .municipality-filter__actions {
             flex-direction: column-reverse;
+        }
+    }
+    @media (max-width: 520px) {
+        .geo-tree__children {
+            grid-template-columns: 1fr;
         }
     }
 </style>
@@ -406,7 +411,7 @@
                     <div class="geo-tree">
                         {% for node in mo_fias_tree %}
                             {% if node.children %}
-                                <details class="geo-tree__node" open>
+                                <details class="geo-tree__node">
                                     <summary class="geo-tree__summary">
                                         <div class="geo-tree__summary-content">
                                             <label class="geo-tree__summary-label">

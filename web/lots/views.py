@@ -684,7 +684,7 @@ class NoticeListView(LoginRequiredMixin, ListView):
     model = Notice
     template_name = "lots/notice_list.html"
     context_object_name = "notices"
-    paginate_by = DEFAULT_PER_PAGE
+    page_size = DEFAULT_PER_PAGE
 
     @cached_property
     def selected_subject_codes(self) -> list[str]:
@@ -717,6 +717,15 @@ class NoticeListView(LoginRequiredMixin, ListView):
         return queryset.order_by("-publish_date", "-fetched_at", "notice_number")
 
     @cached_property
+    def current_page(self) -> int:
+        raw_value = self.request.GET.get("page")
+        try:
+            page = int(raw_value)
+        except (TypeError, ValueError):
+            return 1
+        return page if page > 0 else 1
+
+    @cached_property
     def subject_option_counts(self) -> dict[str, int]:
         # Counting subjects from raw_data->opendata->notice->lots for every request
         # forces a full JSONB scan on production-sized data. Keep the filter itself,
@@ -725,16 +734,34 @@ class NoticeListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        for notice in context["notices"]:
-            _attach_notice_list_display(notice)
+        context.pop("paginator", None)
+        context.pop("page_obj", None)
+        context.pop("is_paginated", None)
 
-        page_obj = context["page_obj"]
-        paginator = page_obj.paginator
-        elided_pages = paginator.get_elided_page_range(
-            number=page_obj.number,
-            on_each_side=1,
-            on_ends=1,
+        offset = (self.current_page - 1) * self.page_size
+        page_slice = list(self.object_list[offset : offset + self.page_size + 1])
+        has_next = len(page_slice) > self.page_size
+        notices = page_slice[: self.page_size]
+
+        context["notices"] = notices
+        context["object_list"] = notices
+        context["page_number"] = self.current_page
+        context["per_page"] = self.page_size
+        context["has_previous"] = self.current_page > 1
+        context["has_next"] = has_next
+        context["previous_page_querystring"] = (
+            _updated_querystring(self.request, page=self.current_page - 1)
+            if self.current_page > 1
+            else ""
         )
+        context["next_page_querystring"] = (
+            _updated_querystring(self.request, page=self.current_page + 1)
+            if has_next
+            else ""
+        )
+
+        for notice in notices:
+            _attach_notice_list_display(notice)
 
         context["subject_options"] = [
             {
@@ -747,18 +774,6 @@ class NoticeListView(LoginRequiredMixin, ListView):
         ]
         context["selected_subjects"] = self.selected_subject_codes
         context["page_querystring"] = _updated_querystring(self.request, page=None)
-        context["pagination_links"] = [
-            {
-                "label": page,
-                "number": page if isinstance(page, int) else None,
-                "is_current": page == page_obj.number,
-                "is_ellipsis": page == paginator.ELLIPSIS,
-                "querystring": _updated_querystring(self.request, page=page)
-                if isinstance(page, int)
-                else "",
-            }
-            for page in elided_pages
-        ]
         return context
 
 

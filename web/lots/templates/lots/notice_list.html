@@ -147,19 +147,19 @@
                 <div class="badge badge--accent">Извещения</div>
                 <h2 class="section-title">Извещения</h2>
                 <p class="section-subtitle">
-                    Единый список извещений с серверной фильтрацией по субъектам РФ.
+                    Единый список извещений с серверной фильтрацией по субъектам РФ и облегчённой постраничной навигацией.
                 </p>
             </div>
             <div class="hero-metrics">
                 <div class="metric">
-                    <div class="metric__label">Всего найдено</div>
-                    <div class="metric__value">{{ page_obj.paginator.count }}</div>
-                    <div class="metric__hint">По текущим условиям</div>
+                    <div class="metric__label">На странице</div>
+                    <div class="metric__value">{{ notices|length }}</div>
+                    <div class="metric__hint">Без глобального count()</div>
                 </div>
                 <div class="metric">
                     <div class="metric__label">Страница</div>
-                    <div class="metric__value">{{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</div>
-                    <div class="metric__hint">По {{ page_obj.paginator.per_page }} извещений</div>
+                    <div class="metric__value">{{ page_number }}</div>
+                    <div class="metric__hint">По {{ per_page }} извещений</div>
                 </div>
             </div>
         </div>
@@ -265,9 +265,9 @@
     <div class="panel__body stack">
         <div class="toolbar">
             <div class="toolbar__meta">
-                <span class="badge badge--accent">Извещения: {{ page_obj.paginator.count }}</span>
+                <span class="badge badge--accent">Извещений на странице: {{ notices|length }}</span>
             </div>
-            <div class="muted">Фильтрация выполняется на сервере.</div>
+            <div class="muted">Фильтрация и навигация выполняются без глобального count().</div>
         </div>
 
         {% if notices %}
@@ -311,22 +311,16 @@
             </div>
 
             <div class="pagination">
-                <div class="muted">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</div>
+                <div class="muted">Страница {{ page_number }}</div>
                 <div class="pagination__pages">
-                    {% if page_obj.has_previous %}
-                        <a class="pagination__link" href="?{{ page_querystring }}{% if page_querystring %}&{% endif %}page={{ page_obj.previous_page_number }}">Назад</a>
+                    {% if has_previous %}
+                        <a class="pagination__link" href="?{{ previous_page_querystring }}">Назад</a>
                     {% endif %}
 
-                    {% for item in pagination_links %}
-                        {% if item.is_ellipsis %}
-                            <span class="pagination__ellipsis">{{ item.label }}</span>
-                        {% else %}
-                            <a class="pagination__link{% if item.is_current %} is-current{% endif %}" href="?{{ item.querystring }}">{{ item.label }}</a>
-                        {% endif %}
-                    {% endfor %}
+                    <span class="pagination__link is-current">Страница {{ page_number }}</span>
 
-                    {% if page_obj.has_next %}
-                        <a class="pagination__link" href="?{{ page_querystring }}{% if page_querystring %}&{% endif %}page={{ page_obj.next_page_number }}">Дальше</a>
+                    {% if has_next %}
+                        <a class="pagination__link" href="?{{ next_page_querystring }}">Дальше</a>
                     {% endif %}
                 </div>
             </div>

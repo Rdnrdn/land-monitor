@@ -328,6 +328,13 @@ class Notice(Base):
         Index("idx_notices_notice_number", "notice_number", unique=True),
         Index("idx_notices_auction_site_domain", "auction_site_domain"),
         Index("idx_notices_raw_data_gin", "raw_data", postgresql_using="gin"),
+        Index(
+            "idx_notices_opendata_publish_sort",
+            "publish_date",
+            "fetched_at",
+            "notice_number",
+            postgresql_where=text("raw_data ? 'opendata'"),
+        ),
     )
 
     notice_number: Mapped[str] = mapped_column(Text, primary_key=True)

@@ -6,7 +6,6 @@ from datetime import date, datetime
 from functools import cached_property
 
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
@@ -19,6 +18,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import DetailView, ListView
 
+from .auth_utils import OptionalLoginRequiredMixin
 from .models import Lot, Notice, Region, Subject, UserLot, UserLotStatus
 from .safe_municipalities import (
     MOSCOW_OBLAST_SLUG,
@@ -701,7 +701,7 @@ def _attach_notice_list_display(notice: Notice) -> None:
     notice.has_images = has_images
 
 
-class NoticeListView(LoginRequiredMixin, ListView):
+class NoticeListView(OptionalLoginRequiredMixin, ListView):
     model = Notice
     template_name = "lots/notice_list.html"
     context_object_name = "notices"
@@ -798,7 +798,7 @@ class NoticeListView(LoginRequiredMixin, ListView):
         return context
 
 
-class NoticeDetailView(LoginRequiredMixin, DetailView):
+class NoticeDetailView(OptionalLoginRequiredMixin, DetailView):
     model = Notice
     template_name = "lots/notice_detail.html"
     context_object_name = "notice"
@@ -837,7 +837,7 @@ class NoticeDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-class LotListView(LoginRequiredMixin, ListView):
+class LotListView(OptionalLoginRequiredMixin, ListView):
     model = Lot
     template_name = "lots/lot_list.html"
     context_object_name = "lots"
@@ -1378,7 +1378,7 @@ class LotListView(LoginRequiredMixin, ListView):
         return context
 
 
-class LotDetailView(LoginRequiredMixin, DetailView):
+class LotDetailView(OptionalLoginRequiredMixin, DetailView):
     model = Lot
     template_name = "lots/lot_detail.html"
     context_object_name = "lot"
@@ -1412,7 +1412,7 @@ class LotDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-class LotQuickActionView(LoginRequiredMixin, View):
+class LotQuickActionView(OptionalLoginRequiredMixin, View):
     def post(self, request: HttpRequest, pk: int) -> HttpResponseRedirect:
         lot = get_object_or_404(_scoped_lot_queryset(), pk=pk)
         action = request.POST.get("action", "")

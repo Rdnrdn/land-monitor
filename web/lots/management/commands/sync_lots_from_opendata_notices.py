@@ -323,6 +323,11 @@ class Command(BaseCommand):
             help="Safety cap for notices processed. Required to avoid accidental mass backfill.",
         )
         parser.add_argument(
+            "--after-notice-number",
+            default=None,
+            help="Optional exclusive cursor. Only notices with notice_number greater than this value are considered.",
+        )
+        parser.add_argument(
             "--report-path",
             default=None,
             help="Optional JSON report path. Defaults to .local/diagnostics/opendata_notice_lot_sync_<timestamp>.json.",
@@ -332,6 +337,7 @@ class Command(BaseCommand):
         started_at = datetime.now(timezone.utc)
         dry_run = bool(options["dry_run"])
         limit_notices = int(options["limit_notices"])
+        after_notice_number = _clean_text(options.get("after_notice_number"))
         if limit_notices <= 0:
             raise CommandError("--limit-notices must be a positive integer.")
 
@@ -357,19 +363,23 @@ class Command(BaseCommand):
             "field_updates": {},
             "examples": [],
             "problem_examples": [],
+            "after_notice_number": after_notice_number,
+            "first_notice_number_in_batch": None,
+            "last_notice_number_in_batch": None,
         }
 
         db = SessionLocal()
         try:
             subjects_by_code = {subject.code: subject for subject in db.query(Subject).all()}
-            query = (
-                db.query(Notice)
-                .filter(Notice.raw_data["opendata"].isnot(None))
-                .order_by(Notice.notice_number)
-                .limit(limit_notices)
-            )
+            query = db.query(Notice).filter(Notice.raw_data["opendata"].isnot(None))
+            if after_notice_number:
+                query = query.filter(Notice.notice_number > after_notice_number)
+            query = query.order_by(Notice.notice_number).limit(limit_notices)
 
             for notice_row in query.yield_per(25):
+                if stats["first_notice_number_in_batch"] is None:
+                    stats["first_notice_number_in_batch"] = notice_row.notice_number
+                stats["last_notice_number_in_batch"] = notice_row.notice_number
                 stats["notices_scanned"] += 1
                 raw_data = _as_dict(notice_row.raw_data)
                 notice_payload = _opendata_notice_payload(raw_data)
@@ -588,5 +598,8 @@ class Command(BaseCommand):
         self.stdout.write(f"field_updates={json.dumps(stats['field_updates'], ensure_ascii=False)}")
         self.stdout.write(f"examples={json.dumps(stats['examples'], ensure_ascii=False)}")
         self.stdout.write(f"problem_examples={json.dumps(stats['problem_examples'][:5], ensure_ascii=False)}")
+        self.stdout.write(f"after_notice_number={stats['after_notice_number']}")
+        self.stdout.write(f"first_notice_number_in_batch={stats['first_notice_number_in_batch']}")
+        self.stdout.write(f"last_notice_number_in_batch={stats['last_notice_number_in_batch']}")
         self.stdout.write(f"dry_run={dry_run}")
         self.stdout.write(f"report_path={report_path}")

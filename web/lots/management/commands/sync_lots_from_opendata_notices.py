@@ -19,6 +19,12 @@ CANCELED_STATUS = "CANCELED"
 CADASTRAL_NUMBER_CODES = {"CadastralNumber"}
 AREA_CODES = {"SquareZU", "SquareZU_project"}
 PERMITTED_USE_CODES = {"PermittedUse"}
+CONTRACT_TYPE_CODES = {"DA_contractType_IPS(ZK)", "DA_contractType_EA(ZK)"}
+LAND_RESTRICTIONS_CODE = "DA_landRestrictions_EA(ZK)"
+CONTRACT_SIGN_PERIOD_CODE = "DA_contractSignPeriod__EA(ZK)"
+RENT_CONTRACT_CODES = {"leaseAgreement", "договор_аренды_земельного_участка_Select"}
+SALE_CONTRACT_CODES = {"purchaseSaleAgreement", "договор_купли_продажи_земельного_участка_Select"}
+UNKNOWN_CONTRACT_CODES = {"notEstablishedAgreement"}
 
 LOT_SNAPSHOT_KEYS = (
     "lotNumber",
@@ -86,6 +92,65 @@ def _characteristic_value(characteristics: Any, codes: set[str]) -> Any:
         if isinstance(item, dict) and item.get("code") in codes:
             return item.get("characteristicValue")
     return None
+
+
+def _additional_details_items(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _normalize_contract_type_bucket(value_code: str | None, value_name: str | None) -> str | None:
+    if value_code in RENT_CONTRACT_CODES:
+        return "rent"
+    if value_code in SALE_CONTRACT_CODES:
+        return "sale"
+    if value_code in UNKNOWN_CONTRACT_CODES:
+        return "unknown"
+
+    normalized_name = (value_name or "").strip().lower()
+    if "аренд" in normalized_name:
+        return "rent"
+    if "купли-продажи" in normalized_name or "купля-продажа" in normalized_name:
+        return "sale"
+    if "не установлен" in normalized_name:
+        return "unknown"
+    return None
+
+
+def _extract_lot_contract_terms(lot_snapshot: dict[str, Any]) -> dict[str, str | None]:
+    contract_type_bucket: str | None = None
+    contract_type_source_code: str | None = None
+    contract_type_source_name: str | None = None
+    land_restrictions_text: str | None = None
+    contract_sign_period_text: str | None = None
+
+    for detail in _additional_details_items(lot_snapshot.get("additionalDetails")):
+        detail_code = _clean_text(detail.get("code"))
+        value = detail.get("value")
+        value_code = _dict_value(value, "code")
+        value_name = _dict_value(value, "name") or _clean_text(value)
+
+        if detail_code in CONTRACT_TYPE_CODES and contract_type_bucket is None:
+            contract_type_bucket = _normalize_contract_type_bucket(value_code, value_name)
+            contract_type_source_code = value_code
+            contract_type_source_name = value_name
+            continue
+
+        if detail_code == LAND_RESTRICTIONS_CODE and land_restrictions_text is None:
+            land_restrictions_text = value_name
+            continue
+
+        if detail_code == CONTRACT_SIGN_PERIOD_CODE and contract_sign_period_text is None:
+            contract_sign_period_text = value_name
+
+    return {
+        "contract_type_bucket": contract_type_bucket,
+        "contract_type_source_code": contract_type_source_code,
+        "contract_type_source_name": contract_type_source_name,
+        "land_restrictions_text": land_restrictions_text,
+        "contract_sign_period_text": contract_sign_period_text,
+    }
 
 
 def _fias_guid(estate_address_fias: Any) -> str | None:
@@ -210,6 +275,7 @@ def _mapped_values(
     characteristics = lot_snapshot.get("characteristics")
     subject_code = _dict_value(subject, "code")
     fias_levels = extract_fias_levels(lot_snapshot.get("estateAddressFIAS"))
+    contract_terms = _extract_lot_contract_terms(lot_snapshot)
 
     return {
         "title": _clean_text(lot_snapshot.get("lotName")),
@@ -226,6 +292,7 @@ def _mapped_values(
         "cadastre_number": _value_to_text(_characteristic_value(characteristics, CADASTRAL_NUMBER_CODES)),
         "area_m2": _value_to_decimal(_characteristic_value(characteristics, AREA_CODES)),
         "permitted_use": _value_to_text(_characteristic_value(characteristics, PERMITTED_USE_CODES)),
+        **contract_terms,
         **fias_levels,
     }
 
@@ -243,6 +310,11 @@ def _apply_mapped_values(lot: Lot, mapped_values: dict[str, Any]) -> set[str]:
         "ownership_form_name",
         "lot_status_external",
         "source_notice_bidd_type_code",
+        "contract_type_bucket",
+        "contract_type_source_code",
+        "contract_type_source_name",
+        "land_restrictions_text",
+        "contract_sign_period_text",
         "fias_level_3_guid",
         "fias_level_3_name",
         "fias_level_5_guid",
@@ -291,6 +363,11 @@ def _new_lot(
         ownership_form_name=mapped_values.get("ownership_form_name"),
         lot_status_external=mapped_values.get("lot_status_external"),
         source_notice_bidd_type_code=mapped_values.get("source_notice_bidd_type_code"),
+        contract_type_bucket=mapped_values.get("contract_type_bucket"),
+        contract_type_source_code=mapped_values.get("contract_type_source_code"),
+        contract_type_source_name=mapped_values.get("contract_type_source_name"),
+        land_restrictions_text=mapped_values.get("land_restrictions_text"),
+        contract_sign_period_text=mapped_values.get("contract_sign_period_text"),
         fias_level_3_guid=mapped_values.get("fias_level_3_guid"),
         fias_level_3_name=mapped_values.get("fias_level_3_name"),
         fias_level_5_guid=mapped_values.get("fias_level_5_guid"),

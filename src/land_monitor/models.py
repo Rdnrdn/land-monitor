@@ -276,6 +276,11 @@ class Lot(Base):
 
     lot_status_external: Mapped[str | None] = mapped_column(Text)
     source_notice_bidd_type_code: Mapped[str | None] = mapped_column(Text)
+    contract_type_bucket: Mapped[str | None] = mapped_column(Text)
+    contract_type_source_code: Mapped[str | None] = mapped_column(Text)
+    contract_type_source_name: Mapped[str | None] = mapped_column(Text)
+    land_restrictions_text: Mapped[str | None] = mapped_column(Text)
+    contract_sign_period_text: Mapped[str | None] = mapped_column(Text)
     fias_level_3_guid: Mapped[str | None] = mapped_column(Text)
     fias_level_3_name: Mapped[str | None] = mapped_column(Text)
     fias_level_5_guid: Mapped[str | None] = mapped_column(Text)

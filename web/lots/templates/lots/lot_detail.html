@@ -64,10 +64,15 @@
                     {% endif %}
                 </dd>
             {% endfor %}
-            {% if lot.source_url %}
+            {% if lot.source_lot_id %}
                 <dt>Ссылка на источник</dt>
                 <dd>
-                    <a href="{{ lot.source_url }}" target="_blank" rel="noreferrer">Открыть источник</a>
+                    <a href="https://torgi.gov.ru/new/public/lots/lot/{{ lot.source_lot_id }}" target="_blank" rel="noopener noreferrer">Открыть источник</a>
+                </dd>
+            {% elif lot.source_url %}
+                <dt>Ссылка на источник</dt>
+                <dd>
+                    <a href="{{ lot.source_url }}" target="_blank" rel="noopener noreferrer">Открыть источник</a>
                 </dd>
             {% endif %}
         </dl>

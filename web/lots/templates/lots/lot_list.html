@@ -546,8 +546,10 @@
                                 </p>
                             </div>
                             <div class="toolbar__meta">
-                                {% if lot.source_url %}
-                                    <a class="button button--ghost" href="{{ lot.source_url }}" target="_blank" rel="noreferrer">Источник</a>
+                                {% if lot.source_lot_id %}
+                                    <a class="button button--ghost" href="https://torgi.gov.ru/new/public/lots/lot/{{ lot.source_lot_id }}" target="_blank" rel="noopener noreferrer">Источник</a>
+                                {% elif lot.source_url %}
+                                    <a class="button button--ghost" href="{{ lot.source_url }}" target="_blank" rel="noopener noreferrer">Источник</a>
                                 {% endif %}
                             </div>
                         </div>

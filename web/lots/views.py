@@ -61,6 +61,7 @@ VALID_USER_STATUSES = {choice for choice, _ in STATUS_CHOICES}
 DEFAULT_PER_PAGE = 25
 PER_PAGE_OPTIONS = (25, 50, 100)
 MOSCOW_OBLAST_RF_CODE = "50"
+HIDDEN_REGION_SLUGS = {"leningradskaya-oblast"}
 DEAL_TYPE_LABELS = {
     "sale": "Продажа",
     "rent": "Аренда",
@@ -1373,7 +1374,9 @@ class LotListView(OptionalLoginRequiredMixin, ListView):
         context["per_page_options"] = PER_PAGE_OPTIONS
         context["current_per_page"] = self.get_paginate_by(self.object_list)
         context["region_options"] = list(
-            Region.objects.filter(is_active=True).order_by("sort_order", "name")
+            Region.objects.filter(is_active=True)
+            .exclude(slug__in=HIDDEN_REGION_SLUGS)
+            .order_by("sort_order", "name")
         )
         context["selected_region"] = self.selected_region
         context["subject_options"] = [

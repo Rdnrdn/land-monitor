@@ -5,6 +5,31 @@ from django.utils.dateparse import parse_datetime
 
 
 class OpendataNoticeIngestTests(SimpleTestCase):
+    def test_notice_bidd_type_code_reads_common_info_path(self):
+        from lots.management.commands.ingest_notices_opendata import _notice_bidd_type_code
+
+        payload = {
+            "exportObject": {
+                "structuredObject": {
+                    "notice": {
+                        "commonInfo": {
+                            "biddType": {
+                                "code": "ZK",
+                                "name": "Аренда и продажа земельных участков",
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        self.assertEqual(_notice_bidd_type_code(payload), "ZK")
+
+    def test_notice_bidd_type_code_returns_none_for_missing_path(self):
+        from lots.management.commands.ingest_notices_opendata import _notice_bidd_type_code
+
+        self.assertIsNone(_notice_bidd_type_code({}))
+
     def test_effective_backlog_excludes_processed_before_limit(self):
         from lots.management.commands.ingest_notices_opendata import (
             _filter_backlog_pairs,

@@ -133,6 +133,16 @@ def _notice_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return notice if isinstance(notice, dict) else {}
 
 
+def _notice_bidd_type_code(payload: dict[str, Any]) -> str | None:
+    notice = _notice_from_payload(payload)
+    common = _as_dict(notice.get("commonInfo"))
+    bidd_type = common.get("biddType") or notice.get("biddType")
+    code = _get_nested(_as_dict(bidd_type), "code")
+    if not code:
+        return None
+    return str(code).strip() or None
+
+
 def _notice_number(item: dict[str, Any], notice: dict[str, Any]) -> str | None:
     value = item.get("regNum") or _get_nested(notice, "commonInfo", "noticeNumber") or notice.get("noticeNumber")
     return str(value).strip() if value else None
@@ -168,7 +178,7 @@ def _notice_values(
         "publish_date": publish_date,
         "create_date": create_date,
         "update_date": update_date,
-        "bidd_type_code": _get_nested(bidd_type, "code"),
+        "bidd_type_code": _notice_bidd_type_code(payload),
         "bidd_form_code": _get_nested(bidd_form, "code"),
         "bidder_org_name": bidder_org_info.get("name") or bidder_org.get("name"),
         "right_holder_name": right_holder_org.get("name") or right_holder_info.get("name"),
@@ -403,6 +413,11 @@ class Command(BaseCommand):
             metavar="N",
             help="Include first N planned-batch rows (reg_num, canonical publish, href prefix) in the JSON report for debugging.",
         )
+        parser.add_argument(
+            "--only-zk",
+            action="store_true",
+            help="Only persist notices with biddType.code=ZK. Non-ZK notices are skipped after payload download.",
+        )
 
     def handle(self, *args, **options):
         date_from = _parse_date(options["date_from"], "--date-from")
@@ -414,6 +429,7 @@ class Command(BaseCommand):
         if not subject_codes:
             raise CommandError("--subjects must contain at least one subjectEstateCode.")
 
+        only_zk = bool(options["only_zk"])
         max_hrefs = int(options["max_hrefs"])
         session = requests.Session()
 
@@ -549,6 +565,8 @@ class Command(BaseCommand):
         skipped_processed = 0
         unique_versions_detected = 0
         processed_count = 0
+        skipped_non_zk_notices = 0
+        processed_zk_notices = 0
 
         for item, key_values in selected_candidate_pairs:
             href = str(item["href"])
@@ -629,6 +647,11 @@ class Command(BaseCommand):
                 time.sleep(options["delay"])
                 continue
 
+            if only_zk and values["bidd_type_code"] != "ZK":
+                skipped_non_zk_notices += 1
+                time.sleep(options["delay"])
+                continue
+
             db = SessionLocal()
             try:
                 notice = db.get(Notice, values["notice_number"])
@@ -674,6 +697,8 @@ class Command(BaseCommand):
                 version.updated_at = fetched_at
                 db.commit()
                 processed_count += 1
+                if values["bidd_type_code"] == "ZK":
+                    processed_zk_notices += 1
             except Exception as exc:
                 db.rollback()
                 errors.append(
@@ -732,6 +757,7 @@ class Command(BaseCommand):
             "meta_url": meta_url,
             "date_from": date_from.isoformat(),
             "date_to": date_to.isoformat(),
+            "only_zk": only_zk,
             "subjects": sorted(subject_codes),
             "document_type": "notice",
             "data_files_selected": selected_data_files,
@@ -763,6 +789,8 @@ class Command(BaseCommand):
             "planned_batch_identity_debug_sample": planned_batch_identity_debug_sample,
             "hrefs_downloaded": href_downloaded,
             "processed": processed_count,
+            "processed_zk_notices": processed_zk_notices,
+            "skipped_non_zk_notices": skipped_non_zk_notices,
             "created": created,
             "updated": updated,
             "skipped_existing_same": skipped_existing_same,
@@ -775,6 +803,7 @@ class Command(BaseCommand):
         self.stdout.write(f"meta_url={meta_url}")
         self.stdout.write(f"date_from={date_from}")
         self.stdout.write(f"date_to={date_to}")
+        self.stdout.write(f"only_zk={only_zk}")
         self.stdout.write(f"subjects={','.join(sorted(subject_codes))}")
         self.stdout.write(f"data_files_selected={len(selected_data_files)}")
         self.stdout.write(f"data_file_kind_counts={json.dumps(data_file_kind_counts, ensure_ascii=False, sort_keys=True)}")
@@ -809,6 +838,8 @@ class Command(BaseCommand):
         self.stdout.write(f"effective_backlog_remaining_after_planned={backlog_remaining_after_planned}")
         self.stdout.write(f"hrefs_downloaded={href_downloaded}")
         self.stdout.write(f"processed={processed_count}")
+        self.stdout.write(f"processed_zk_notices={processed_zk_notices}")
+        self.stdout.write(f"skipped_non_zk_notices={skipped_non_zk_notices}")
         self.stdout.write(f"created={created}")
         self.stdout.write(f"updated={updated}")
         self.stdout.write(f"skipped_existing_same={skipped_existing_same}")

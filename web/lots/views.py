@@ -236,6 +236,25 @@ def _get_lot_deal_type(lot: Lot) -> str | None:
     return deal_type
 
 
+def _get_lot_contract_type_bucket_display(lot: Lot) -> str | None:
+    bucket = _clean_display_text(lot.contract_type_bucket)
+    if bucket in DEAL_TYPE_LABELS:
+        return DEAL_TYPE_LABELS[bucket]
+    return bucket
+
+
+def _get_lot_contract_type_source_display(lot: Lot) -> str | None:
+    source_name = _clean_display_text(lot.contract_type_source_name)
+    deal_type_display = _get_lot_contract_type_bucket_display(lot)
+    if source_name and deal_type_display and _display_text_key(source_name) == _display_text_key(deal_type_display):
+        return None
+    return source_name
+
+
+def _get_lot_deal_type_display(lot: Lot) -> str | None:
+    return _get_lot_contract_type_bucket_display(lot) or _get_lot_deal_type(lot)
+
+
 def _get_lotcard_deal_type(lotcard_data: dict) -> str | None:
     deal_type = lotcard_data.get("typeTransaction")
     if deal_type in DEAL_TYPE_LABELS:
@@ -410,11 +429,16 @@ def _build_lot_detail_rows(
     canonical_municipality_label: str | None,
     estate_address_display: str | None,
 ) -> list[dict[str, object]]:
+    deal_type_display = _get_lot_deal_type_display(lot)
+    contract_type_source_display = _get_lot_contract_type_source_display(lot)
     rows: list[dict[str, object]] = [
         {"label": "ID", "value": lot.id},
         {"label": "Источник", "value": lot.source},
         {"label": "ID лота в источнике", "value": lot.source_lot_id},
     ]
+
+    if lot.subject_ref_id and lot.subject_ref and _has_detail_value(lot.subject_ref.name):
+        rows.append({"label": "Субъект РФ", "value": lot.subject_ref.name})
 
     if _has_detail_value(lot.region_display):
         rows.append({"label": "Регион", "value": lot.region_display})
@@ -422,6 +446,14 @@ def _build_lot_detail_rows(
     municipality_value = canonical_municipality_label or lot.municipality_name
     if _has_detail_value(municipality_value):
         rows.append({"label": "Муниципалитет", "value": municipality_value})
+
+    for label, value in (
+        ("ФИАС уровень 3", lot.fias_level_3_name),
+        ("ФИАС уровень 5", lot.fias_level_5_name),
+        ("ФИАС уровень 6", lot.fias_level_6_name),
+    ):
+        if _has_detail_value(value):
+            rows.append({"label": label, "value": value})
 
     region_code = (
         lot.region_ref.torgi_region_code
@@ -439,7 +471,9 @@ def _build_lot_detail_rows(
         ("Кадастровый номер", lot.cadastre_number),
         ("Площадь, м²", lot.area_m2),
         ("Категория", lot.category),
-        ("Тип сделки", _get_lot_deal_type(lot)),
+        ("Тип сделки", deal_type_display),
+        ("Вид договора", contract_type_source_display),
+        ("Форма собственности", lot.ownership_form_name),
         ("Разрешённое использование", lot.permitted_use),
         ("Начальная цена", lot.price_min),
         ("Итоговая цена", lot.price_fin),
@@ -454,6 +488,8 @@ def _build_lot_detail_rows(
         ("Дней до дедлайна", lot.days_to_deadline),
         ("Score", lot.score),
         ("Сегмент", lot.segment),
+        ("Ограничения", lot.land_restrictions_text),
+        ("Срок подписания договора", lot.contract_sign_period_text),
         ("Описание", lot.description),
     )
     for label, value in optional_rows:
@@ -1244,6 +1280,8 @@ class LotListView(OptionalLoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         for lot in context["lots"]:
             lot.user_lot_state = _get_user_lot_state(lot)
+            lot.deal_type_display = _get_lot_deal_type_display(lot)
+            lot.deal_type_source_display = _get_lot_contract_type_source_display(lot)
 
         base_queryset = _scoped_lot_queryset()
         current_tab = self.get_current_tab()
@@ -1382,7 +1420,12 @@ class LotDetailView(OptionalLoginRequiredMixin, DetailView):
     model = Lot
     template_name = "lots/lot_detail.html"
     context_object_name = "lot"
-    queryset = _scoped_lot_queryset().select_related("user_lot", "region_ref", "municipality_ref")
+    queryset = _scoped_lot_queryset().select_related(
+        "user_lot",
+        "region_ref",
+        "municipality_ref",
+        "subject_ref",
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

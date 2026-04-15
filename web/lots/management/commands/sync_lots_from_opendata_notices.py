@@ -25,6 +25,11 @@ CONTRACT_SIGN_PERIOD_CODE = "DA_contractSignPeriod__EA(ZK)"
 RENT_CONTRACT_CODES = {"leaseAgreement", "договор_аренды_земельного_участка_Select"}
 SALE_CONTRACT_CODES = {"purchaseSaleAgreement", "договор_купли_продажи_земельного_участка_Select"}
 UNKNOWN_CONTRACT_CODES = {"notEstablishedAgreement"}
+APPLICATION_ADDRESS_DETAIL_CODES = (
+    "DA_applicationAddressRules_IPS(ZK)",
+    "DA_applicationAddressRules_EA(ZK)",
+)
+APPLICATION_ADDRESS_DETAIL_PREFIXES = ("DA_applicationAddressRules",)
 
 LOT_SNAPSHOT_KEYS = (
     "lotNumber",
@@ -100,6 +105,20 @@ def _value_to_decimal(value: Any) -> Decimal | None:
         return Decimal(str(value))
     except (InvalidOperation, ValueError):
         return None
+
+
+def _parse_timestamp(value: Any) -> datetime | None:
+    cleaned = _clean_text(value)
+    if not cleaned:
+        return None
+    normalized = cleaned.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
 
 
 def _characteristic_value(characteristics: Any, codes: set[str]) -> Any:
@@ -243,6 +262,55 @@ def _notice_bidd_type_code(notice_payload: dict[str, Any]) -> str | None:
     return _dict_value(common_info.get("biddType"), "code")
 
 
+def _notice_additional_details(notice_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    return _additional_details_items(notice_payload.get("additionalDetails"))
+
+
+def _notice_application_address(notice_payload: dict[str, Any]) -> str | None:
+    details = _notice_additional_details(notice_payload)
+    for code in APPLICATION_ADDRESS_DETAIL_CODES:
+        for item in details:
+            if item.get("code") != code:
+                continue
+            value = _value_to_text(item.get("value"))
+            if value:
+                return value
+
+    for item in details:
+        detail_code = _clean_text(item.get("code")) or ""
+        if not any(detail_code.startswith(prefix) for prefix in APPLICATION_ADDRESS_DETAIL_PREFIXES):
+            continue
+        value = _value_to_text(item.get("value"))
+        if value:
+            return value
+    return None
+
+
+def _notice_url(notice_number: str | None) -> str | None:
+    if not notice_number:
+        return None
+    return f"https://torgi.gov.ru/new/public/notices/view/{notice_number}"
+
+
+def _notice_summary_values(
+    notice_row: Notice,
+    notice_payload: dict[str, Any],
+) -> dict[str, Any]:
+    notice_number = _notice_number(notice_row, notice_payload)
+    bidd_conditions = _as_dict(notice_payload.get("biddConditions"))
+    application_start_at = _parse_timestamp(bidd_conditions.get("biddStartTime"))
+    application_deadline = _parse_timestamp(bidd_conditions.get("biddEndTime"))
+    return {
+        "notice_number": notice_number,
+        "notice_publish_date": notice_row.publish_date,
+        "application_start_date": application_start_at,
+        "application_start_at": application_start_at,
+        "application_deadline": application_deadline,
+        "application_address": _notice_application_address(notice_payload),
+        "notice_url": _notice_url(notice_number),
+    }
+
+
 def _lot_snapshot(lot_payload: dict[str, Any]) -> dict[str, Any]:
     bidding_object = _as_dict(lot_payload.get("biddingObjectInfo"))
     snapshot = {
@@ -325,6 +393,7 @@ def _mapped_values(
     *,
     subjects_by_code: dict[str, Subject],
     source_notice_bidd_type_code: str | None,
+    notice_summary: dict[str, Any] | None = None,
     fias_levels: dict[str, str | None] | None = None,
 ) -> dict[str, Any]:
     subject = _as_dict(lot_snapshot.get("subjectRF"))
@@ -334,8 +403,16 @@ def _mapped_values(
     subject_code = _dict_value(subject, "code")
     fias_levels = fias_levels or extract_fias_levels(lot_snapshot.get("estateAddressFIAS"))
     contract_terms = _extract_lot_contract_terms(lot_snapshot)
+    notice_summary = notice_summary or {}
 
     return {
+        "notice_number": notice_summary.get("notice_number"),
+        "notice_publish_date": notice_summary.get("notice_publish_date"),
+        "application_start_date": notice_summary.get("application_start_date"),
+        "application_start_at": notice_summary.get("application_start_at"),
+        "application_deadline": notice_summary.get("application_deadline"),
+        "application_address": notice_summary.get("application_address"),
+        "notice_url": notice_summary.get("notice_url"),
         "title": _clean_text(lot_snapshot.get("lotName")),
         "description": _clean_text(lot_snapshot.get("lotDescription")),
         "subject_rf_code": subject_code,
@@ -362,6 +439,8 @@ def _mapped_values(
 def _apply_mapped_values(lot: Lot, mapped_values: dict[str, Any]) -> set[str]:
     changed_fields: set[str] = set()
     for field in (
+        "notice_number",
+        "notice_url",
         "title",
         "description",
         "subject_rf_code",
@@ -386,6 +465,7 @@ def _apply_mapped_values(lot: Lot, mapped_values: dict[str, Any]) -> set[str]:
         "fias_level_6_name",
         "cadastre_number",
         "permitted_use",
+        "application_address",
     ):
         _set_text_if_present(lot, field, mapped_values.get(field), changed_fields)
 
@@ -393,6 +473,18 @@ def _apply_mapped_values(lot: Lot, mapped_values: dict[str, Any]) -> set[str]:
     _set_decimal_if_present(lot, "price_fin", mapped_values.get("price_fin"), changed_fields)
     _set_decimal_if_present(lot, "deposit_amount", mapped_values.get("deposit_amount"), changed_fields)
     _set_decimal_if_present(lot, "area_m2", mapped_values.get("area_m2"), changed_fields)
+
+    for field in (
+        "notice_publish_date",
+        "application_start_date",
+        "application_start_at",
+        "application_deadline",
+    ):
+        value = mapped_values.get(field)
+        if value is None or getattr(lot, field) == value:
+            continue
+        setattr(lot, field, value)
+        changed_fields.add(field)
 
     subject_id = mapped_values.get("subject_id")
     if subject_id is not None and lot.subject_id != subject_id:
@@ -415,6 +507,8 @@ def _new_lot(
         source_lot_id=source_lot_id,
         source_url=source_url,
         notice_number=notice_number,
+        notice_publish_date=mapped_values.get("notice_publish_date"),
+        notice_url=mapped_values.get("notice_url"),
         title=mapped_values.get("title"),
         description=mapped_values.get("description"),
         subject_id=mapped_values.get("subject_id"),
@@ -438,6 +532,10 @@ def _new_lot(
         contract_type_source_name=mapped_values.get("contract_type_source_name"),
         land_restrictions_text=mapped_values.get("land_restrictions_text"),
         contract_sign_period_text=mapped_values.get("contract_sign_period_text"),
+        application_start_date=mapped_values.get("application_start_date"),
+        application_start_at=mapped_values.get("application_start_at"),
+        application_deadline=mapped_values.get("application_deadline"),
+        application_address=mapped_values.get("application_address"),
         fias_level_3_guid=mapped_values.get("fias_level_3_guid"),
         fias_level_3_name=mapped_values.get("fias_level_3_name"),
         fias_level_5_guid=mapped_values.get("fias_level_5_guid"),
@@ -586,6 +684,7 @@ class Command(BaseCommand):
 
                 stats["notices_processed"] += 1
                 notice_subset = _notice_subset(notice_payload, source_meta)
+                notice_summary = _notice_summary_values(notice_row, notice_payload)
                 source_url = _notice_source_url(notice_payload, source_meta)
                 notice_has_scope_match = False
 
@@ -631,6 +730,7 @@ class Command(BaseCommand):
                             lot_snapshot,
                             subjects_by_code=subjects_by_code,
                             source_notice_bidd_type_code=notice_bidd_type_code,
+                            notice_summary=notice_summary,
                             fias_levels=fias_levels,
                         )
                         lot_status = _clean_text(lot_snapshot.get("lotStatus"))

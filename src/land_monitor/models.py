@@ -237,6 +237,8 @@ class Lot(Base):
         Text,
         ForeignKey("notices.notice_number", ondelete="SET NULL"),
     )
+    notice_publish_date: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    notice_url: Mapped[str | None] = mapped_column(Text)
 
     title: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
@@ -293,7 +295,9 @@ class Lot(Base):
     is_finished: Mapped[bool | None] = mapped_column(Boolean)
 
     application_start_date: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    application_start_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
     application_deadline: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    application_address: Mapped[str | None] = mapped_column(Text)
     application_end_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
     auction_date: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
     auction_start_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))

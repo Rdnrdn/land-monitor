@@ -453,9 +453,9 @@
                         <h4 style="margin: 0 0 6px;">География (Московская область)</h4>
                         <div class="geo-tree__hint">Муниципалитеты верхнего уровня показаны компактной сеткой. Города и деревни открываются во всплывающем блоке рядом с выбранным муниципалитетом.</div>
                     </div>
-                    <div class="geo-tree" data-geo-tree>
+                    <div class="geo-tree collapsed" data-geo-tree>
                         <div class="geo-tree__toolbar">
-                            <button type="button" class="button button--ghost geo-tree__toggle" data-geo-tree-toggle>Свернуть</button>
+                            <button type="button" class="button button--ghost geo-tree__toggle" data-geo-tree-toggle>Развернуть геофильтр</button>
                         </div>
                         <div class="geo-tree__body">
                             <div class="geo-tree__level3">
@@ -1028,19 +1028,16 @@
                 const collapseGeoTree = () => {
                     geoTree.classList.add("collapsed");
                     if (geoTreeToggle) {
-                        geoTreeToggle.textContent = "Показать географию";
+                        geoTreeToggle.textContent = "Развернуть геофильтр";
                     }
                 };
                 const expandGeoTree = () => {
                     geoTree.classList.remove("collapsed");
                     if (geoTreeToggle) {
-                        geoTreeToggle.textContent = "Свернуть";
+                        geoTreeToggle.textContent = "Свернуть геофильтр";
                     }
                 };
-
-                if (window.location.search.includes("fias_level_")) {
-                    collapseGeoTree();
-                }
+                collapseGeoTree();
 
                 if (geoTreeToggle) {
                     geoTreeToggle.addEventListener("click", () => {

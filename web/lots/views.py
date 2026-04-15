@@ -255,6 +255,20 @@ def _get_lot_deal_type_display(lot: Lot) -> str | None:
     return _get_lot_contract_type_bucket_display(lot) or _get_lot_deal_type(lot)
 
 
+def _resolve_deal_type_value(
+    contract_type_bucket: object,
+    raw_type_transaction: object,
+) -> str | None:
+    bucket = _clean_display_text(contract_type_bucket)
+    if bucket in DEAL_TYPE_LABELS:
+        return bucket
+
+    raw_value = _clean_display_text(raw_type_transaction)
+    if raw_value in DEAL_TYPE_LABELS:
+        return raw_value
+    return None
+
+
 def _get_lotcard_deal_type(lotcard_data: dict) -> str | None:
     deal_type = lotcard_data.get("typeTransaction")
     if deal_type in DEAL_TYPE_LABELS:
@@ -557,6 +571,21 @@ def _notice_attachments(raw_data: object) -> list[dict[str, object]]:
     return documents
 
 
+def _notice_additional_detail_value(raw_data: object, detail_code: str) -> str | None:
+    notice_payload = _get_opendata_notice_payload(raw_data)
+    additional_details = notice_payload.get("additionalDetails")
+    if not isinstance(additional_details, list):
+        return None
+
+    for item in additional_details:
+        if not isinstance(item, dict):
+            continue
+        if item.get("code") != detail_code:
+            continue
+        return _clean_display_text(item.get("value"))
+    return None
+
+
 def _build_lot_notice_context(lot: Lot) -> dict[str, object]:
     with connection.cursor() as cursor:
         cursor.execute(
@@ -597,6 +626,18 @@ def _build_lot_notice_context(lot: Lot) -> dict[str, object]:
         raw_data,
     ) = row
 
+    notice_payload = _get_opendata_notice_payload(raw_data)
+    bidd_conditions = notice_payload.get("biddConditions")
+    if not isinstance(bidd_conditions, dict):
+        bidd_conditions = {}
+
+    bidd_start_at = parse_datetime(bidd_conditions.get("biddStartTime", ""))
+    bidd_end_at = parse_datetime(bidd_conditions.get("biddEndTime", ""))
+    application_address = _notice_additional_detail_value(
+        raw_data,
+        "DA_applicationAddressRules_IPS(ZK)",
+    )
+
     notice_rows = [
         notice_row
         for notice_row in (
@@ -605,6 +646,9 @@ def _build_lot_notice_context(lot: Lot) -> dict[str, object]:
             _build_notice_row("Дата публикации", publish_date),
             _build_notice_row("Дата создания", create_date),
             _build_notice_row("Дата обновления", update_date),
+            _build_notice_row("Начало приёма заявок", bidd_start_at),
+            _build_notice_row("Окончание приёма заявок", bidd_end_at),
+            _build_notice_row("Адрес подачи заявлений", application_address),
             _build_notice_row("Портал подачи заявки", application_portal_url),
             _build_notice_row("Площадка торгов", auction_site_url),
         )
@@ -947,7 +991,13 @@ class LotListView(OptionalLoginRequiredMixin, ListView):
                 queryset = queryset.filter(fias_level_3_guid__in=self.selected_fias_level_3_guids)
 
         if apply_deal_type_filter and self.is_deal_type_filter_active:
-            queryset = queryset.filter(raw_data__typeTransaction__in=self.selected_deal_types)
+            queryset = queryset.filter(
+                Q(contract_type_bucket__in=self.selected_deal_types)
+                | (
+                    (Q(contract_type_bucket__isnull=True) | Q(contract_type_bucket=""))
+                    & Q(raw_data__typeTransaction__in=self.selected_deal_types)
+                )
+            )
 
         if self.location_query:
             queryset = queryset.filter(
@@ -1256,8 +1306,9 @@ class LotListView(OptionalLoginRequiredMixin, ListView):
             apply_deal_type_filter=False,
             apply_subject_filter=True,
             apply_fias_filter=True,
-        ).values_list("raw_data__typeTransaction", flat=True)
-        for deal_type in rows.iterator():
+        ).values_list("contract_type_bucket", "raw_data__typeTransaction")
+        for contract_type_bucket, raw_type_transaction in rows.iterator():
+            deal_type = _resolve_deal_type_value(contract_type_bucket, raw_type_transaction)
             if deal_type in DEAL_TYPE_LABELS:
                 counts[deal_type] += 1
         return dict(counts)

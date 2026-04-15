@@ -9,41 +9,51 @@
         display: grid;
         gap: 14px;
         margin-top: 4px;
+        position: relative;
     }
-    .geo-tree__node {
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        background: rgba(248, 250, 252, 0.7);
-        overflow: hidden;
-    }
-    .geo-tree__node--leaf {
-        padding: 14px 16px;
-    }
-    .geo-tree__summary {
-        list-style: none;
-        cursor: pointer;
-        padding: 14px 16px;
-    }
-    .geo-tree__summary::-webkit-details-marker {
+    .geo-tree.collapsed .geo-tree__body {
         display: none;
     }
-    .geo-tree__summary::marker {
-        content: "";
-    }
-    .geo-tree__summary-content {
+    .geo-tree__toolbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
+        flex-wrap: wrap;
     }
-    .geo-tree__summary-label {
+    .geo-tree__toggle {
+        white-space: nowrap;
+    }
+    .geo-tree__body {
+        display: grid;
+        gap: 12px;
+    }
+    .geo-tree__level3 {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px 16px;
+    }
+    .geo-tree__l3-item {
+        position: relative;
+        min-width: 0;
+    }
+    .geo-tree__l3-label {
         display: flex;
         align-items: flex-start;
-        gap: 12px;
+        gap: 10px;
         min-width: 0;
         cursor: pointer;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(248, 250, 252, 0.78);
+        min-height: 100%;
     }
-    .geo-tree__summary-label input,
+    .geo-tree__l3-label:hover {
+        border-color: var(--border-strong);
+        background: rgba(255, 255, 255, 0.95);
+    }
+    .geo-tree__l3-label input,
     .geo-tree__child input {
         width: 16px;
         min-height: 16px;
@@ -52,31 +62,33 @@
         accent-color: var(--accent);
         flex: 0 0 auto;
     }
-    .geo-tree__summary-text {
+    .geo-tree__l3-text {
         color: var(--text);
-        font-size: 0.98rem;
-        font-weight: 600;
+        font-size: 0.94rem;
+        font-weight: 500;
         line-height: 1.35;
     }
-    .geo-tree__caret {
-        width: 10px;
-        height: 10px;
-        border-right: 2px solid currentColor;
-        border-bottom: 2px solid currentColor;
-        transform: rotate(45deg);
-        opacity: 0.55;
-        flex: 0 0 auto;
-        transition: transform 0.18s ease;
-        margin-top: 4px;
+    .geo-tree__popup {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        width: min(440px, calc(100vw - 32px));
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid var(--border-strong);
+        background: rgba(255, 255, 255, 0.98);
+        box-shadow: 0 22px 44px rgba(15, 23, 42, 0.16);
+        display: none;
+        z-index: 25;
     }
-    .geo-tree__node[open] .geo-tree__caret {
-        transform: rotate(225deg);
-    }
-    .geo-tree__children {
+    .geo-tree__l3-item.is-open .geo-tree__popup {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 6px 16px;
-        padding: 0 16px 16px;
+        gap: 12px;
+    }
+    .geo-tree__children-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px 12px;
     }
     .geo-tree__child {
         display: flex;
@@ -85,7 +97,7 @@
         min-width: 0;
         padding: 10px 12px;
         border-radius: 14px;
-        border: 1px solid rgba(203, 213, 225, 0.7);
+        border: 1px solid var(--border);
         background: rgba(255, 255, 255, 0.86);
         cursor: pointer;
     }
@@ -99,6 +111,10 @@
         color: var(--muted);
         font-size: 0.92rem;
         line-height: 1.45;
+    }
+    .geo-tree__actions {
+        display: flex;
+        justify-content: flex-end;
     }
     .municipality-filter {
         position: relative;
@@ -253,8 +269,11 @@
         word-break: break-word;
     }
     @media (max-width: 720px) {
-        .geo-tree__children {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+        .geo-tree__level3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .geo-tree__popup {
+            width: min(100vw - 56px, 420px);
         }
         .municipality-filter__panel {
             width: min(100vw - 40px, 360px);
@@ -264,7 +283,8 @@
         }
     }
     @media (max-width: 520px) {
-        .geo-tree__children {
+        .geo-tree__level3,
+        .geo-tree__children-grid {
             grid-template-columns: 1fr;
         }
     }
@@ -431,55 +451,50 @@
                 <div class="stack" style="margin-top: 20px;">
                     <div>
                         <h4 style="margin: 0 0 6px;">География (Московская область)</h4>
-                        <div class="geo-tree__hint">Муниципалитеты верхнего уровня и вложенные города или деревни. Фильтр работает через GET и сохраняет текущее состояние после reload.</div>
+                        <div class="geo-tree__hint">Муниципалитеты верхнего уровня показаны компактной сеткой. Города и деревни открываются во всплывающем блоке рядом с выбранным муниципалитетом.</div>
                     </div>
-                    <div class="geo-tree">
-                        {% for node in mo_fias_tree %}
-                            {% if node.children %}
-                                <details class="geo-tree__node">
-                                    <summary class="geo-tree__summary">
-                                        <div class="geo-tree__summary-content">
-                                            <label class="geo-tree__summary-label">
-                                                <input
-                                                    type="checkbox"
-                                                    name="fias_level_3"
-                                                    value="{{ node.guid }}"
-                                                    {% if node.guid in selected_fias_level_3_guids %}checked{% endif %}
-                                                >
-                                                <span class="geo-tree__summary-text">{{ node.name }}</span>
-                                            </label>
-                                            <span class="geo-tree__caret" aria-hidden="true"></span>
-                                        </div>
-                                    </summary>
-                                    <div class="geo-tree__children">
-                                        {% for child in node.children %}
-                                            <label class="geo-tree__child">
-                                                <input
-                                                    type="checkbox"
-                                                    name="fias_level_{{ child.level }}"
-                                                    value="{{ child.guid }}"
-                                                    {% if child.level == 5 and child.guid in selected_fias_level_5_guids %}checked{% endif %}
-                                                    {% if child.level == 6 and child.guid in selected_fias_level_6_guids %}checked{% endif %}
-                                                >
-                                                <span>{{ child.name }}</span>
-                                            </label>
-                                        {% endfor %}
+                    <div class="geo-tree" data-geo-tree>
+                        <div class="geo-tree__toolbar">
+                            <button type="button" class="button button--ghost geo-tree__toggle" data-geo-tree-toggle>Свернуть</button>
+                        </div>
+                        <div class="geo-tree__body">
+                            <div class="geo-tree__level3">
+                                {% for node in mo_fias_tree %}
+                                    <div class="geo-tree__l3-item" data-guid="{{ node.guid }}">
+                                        <label class="geo-tree__l3-label">
+                                            <input
+                                                type="checkbox"
+                                                name="fias_level_3"
+                                                value="{{ node.guid }}"
+                                                {% if node.guid in selected_fias_level_3_guids %}checked{% endif %}
+                                            >
+                                            <span class="geo-tree__l3-text">{{ node.name }}</span>
+                                        </label>
+                                        {% if node.children %}
+                                            <div class="geo-tree__popup" data-parent="{{ node.guid }}">
+                                                <div class="geo-tree__children-grid">
+                                                    {% for child in node.children %}
+                                                        <label class="geo-tree__child">
+                                                            <input
+                                                                type="checkbox"
+                                                                name="fias_level_{{ child.level }}"
+                                                                value="{{ child.guid }}"
+                                                                {% if child.level == 5 and child.guid in selected_fias_level_5_guids %}checked{% endif %}
+                                                                {% if child.level == 6 and child.guid in selected_fias_level_6_guids %}checked{% endif %}
+                                                            >
+                                                            <span>{{ child.name }}</span>
+                                                        </label>
+                                                    {% endfor %}
+                                                </div>
+                                                <div class="geo-tree__actions">
+                                                    <button type="button" class="geo-apply" data-geo-apply>Применить</button>
+                                                </div>
+                                            </div>
+                                        {% endif %}
                                     </div>
-                                </details>
-                            {% else %}
-                                <div class="geo-tree__node geo-tree__node--leaf">
-                                    <label class="geo-tree__summary-label">
-                                        <input
-                                            type="checkbox"
-                                            name="fias_level_3"
-                                            value="{{ node.guid }}"
-                                            {% if node.guid in selected_fias_level_3_guids %}checked{% endif %}
-                                        >
-                                        <span class="geo-tree__summary-text">{{ node.name }}</span>
-                                    </label>
-                                </div>
-                            {% endif %}
-                        {% endfor %}
+                                {% endfor %}
+                            </div>
+                        </div>
                     </div>
                 </div>
             {% elif selected_region and selected_region.slug != "moskovskaya-oblast" %}
@@ -504,9 +519,6 @@
                     <a class="button button--ghost" href="?tab={{ current_tab }}">Сбросить фильтры</a>
                 </div>
             </div>
-            {% if show_fias_filter and mo_fias_tree %}
-                <div class="filters__hint">Старые географические поля в интерфейсе скрыты. Для Московской области используйте дерево FIAS level 3 → level 5/6.</div>
-            {% endif %}
         </form>
     </div>
 </section>
@@ -1007,6 +1019,110 @@
                     return `Тип сделки: ${selectedCount}`;
                 },
             });
+
+            const geoTree = form.querySelector("[data-geo-tree]");
+            if (geoTree) {
+                const geoTreeToggle = geoTree.querySelector("[data-geo-tree-toggle]");
+                const geoItems = Array.from(geoTree.querySelectorAll(".geo-tree__l3-item"));
+                const viewportGap = 16;
+                const collapseGeoTree = () => {
+                    geoTree.classList.add("collapsed");
+                    if (geoTreeToggle) {
+                        geoTreeToggle.textContent = "Показать географию";
+                    }
+                };
+                const expandGeoTree = () => {
+                    geoTree.classList.remove("collapsed");
+                    if (geoTreeToggle) {
+                        geoTreeToggle.textContent = "Свернуть";
+                    }
+                };
+
+                if (window.location.search.includes("fias_level_")) {
+                    collapseGeoTree();
+                }
+
+                if (geoTreeToggle) {
+                    geoTreeToggle.addEventListener("click", () => {
+                        if (geoTree.classList.contains("collapsed")) {
+                            expandGeoTree();
+                            return;
+                        }
+                        collapseGeoTree();
+                    });
+                }
+
+                geoItems.forEach((item) => {
+                    const popup = item.querySelector(".geo-tree__popup");
+                    if (!popup) {
+                        return;
+                    }
+
+                    let hideTimerId = null;
+
+                    const positionPopup = () => {
+                        popup.style.left = "0px";
+                        popup.style.right = "auto";
+
+                        const itemRect = item.getBoundingClientRect();
+                        const popupWidth = popup.offsetWidth;
+                        let leftOffset = 0;
+
+                        const rightOverflow = itemRect.left + popupWidth - (window.innerWidth - viewportGap);
+                        if (rightOverflow > 0) {
+                            leftOffset -= rightOverflow;
+                        }
+
+                        const leftOverflow = itemRect.left + leftOffset - viewportGap;
+                        if (leftOverflow < 0) {
+                            leftOffset -= leftOverflow;
+                        }
+
+                        popup.style.left = `${leftOffset}px`;
+                    };
+
+                    const openPopup = () => {
+                        window.clearTimeout(hideTimerId);
+                        geoItems.forEach((otherItem) => {
+                            if (otherItem !== item) {
+                                otherItem.classList.remove("is-open");
+                            }
+                        });
+                        item.classList.add("is-open");
+                        window.requestAnimationFrame(positionPopup);
+                    };
+
+                    const closePopup = () => {
+                        window.clearTimeout(hideTimerId);
+                        hideTimerId = window.setTimeout(() => {
+                            item.classList.remove("is-open");
+                        }, 120);
+                    };
+
+                    item.addEventListener("mouseenter", openPopup);
+                    item.addEventListener("mouseleave", closePopup);
+                    item.addEventListener("focusin", openPopup);
+                    item.addEventListener("focusout", (event) => {
+                        if (!item.contains(event.relatedTarget)) {
+                            closePopup();
+                        }
+                    });
+
+                    const applyButton = popup.querySelector("[data-geo-apply]");
+                    if (applyButton) {
+                        applyButton.addEventListener("click", () => {
+                            collapseGeoTree();
+                            submit();
+                        });
+                    }
+
+                    window.addEventListener("resize", () => {
+                        if (item.classList.contains("is-open")) {
+                            positionPopup();
+                        }
+                    });
+                });
+            }
 
         }
 

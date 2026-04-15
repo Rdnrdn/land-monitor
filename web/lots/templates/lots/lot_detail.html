@@ -137,7 +137,7 @@
                 {% if notice_source_url and notice_source_url != "https://torgi.gov.ru" and notice_source_url != "https://torgi.gov.ru/" and notice_source_url != "http://torgi.gov.ru" and notice_source_url != "http://torgi.gov.ru/" and notice_source_url != "https://www.torgi.gov.ru" and notice_source_url != "https://www.torgi.gov.ru/" and notice_source_url != "http://www.torgi.gov.ru" and notice_source_url != "http://www.torgi.gov.ru/" %}
                     <dt>Оригинал</dt>
                     <dd>
-                        <a href="{{ notice_source_url }}" target="_blank" rel="noreferrer">Открыть оригинальное извещение</a>
+                        <a href="{{ notice_source_url }}" target="_blank" rel="noopener">Открыть оригинальное извещение</a>
                     </dd>
                 {% endif %}
             </dl>

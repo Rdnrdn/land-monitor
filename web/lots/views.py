@@ -570,34 +570,11 @@ def _notice_attachments(raw_data: object) -> list[dict[str, object]]:
     return documents
 
 
-def _notice_additional_detail_value(raw_data: object, detail_code: str) -> str | None:
-    notice_payload = _get_opendata_notice_payload(raw_data)
-    additional_details = notice_payload.get("additionalDetails")
-    if not isinstance(additional_details, list):
-        return None
-
-    for item in additional_details:
-        if not isinstance(item, dict):
-            continue
-        if item.get("code") != detail_code:
-            continue
-        return _clean_display_text(item.get("value"))
-    return None
-
-
 def _build_lot_notice_context(lot: Lot) -> dict[str, object]:
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT
-                n.notice_number,
-                n.notice_status,
-                n.publish_date,
-                n.create_date,
-                n.update_date,
-                n.application_portal_url,
-                n.auction_site_url,
-                n.raw_data
+            SELECT n.raw_data
             FROM lots AS l
             LEFT JOIN notices AS n ON n.notice_number = l.notice_number
             WHERE l.id = %s
@@ -614,59 +591,24 @@ def _build_lot_notice_context(lot: Lot) -> dict[str, object]:
             "notice_source_url": None,
         }
 
-    (
-        notice_number,
-        notice_status,
-        publish_date,
-        create_date,
-        update_date,
-        application_portal_url,
-        auction_site_url,
-        raw_data,
-    ) = row
-
-    notice_payload = _get_opendata_notice_payload(raw_data)
-    bidd_conditions = notice_payload.get("biddConditions")
-    if not isinstance(bidd_conditions, dict):
-        bidd_conditions = {}
-
-    bidd_start_at = parse_datetime(bidd_conditions.get("biddStartTime", ""))
-    bidd_end_at = parse_datetime(bidd_conditions.get("biddEndTime", ""))
-    application_address = _notice_additional_detail_value(
-        raw_data,
-        "DA_applicationAddressRules_IPS(ZK)",
-    )
+    (raw_data,) = row
 
     notice_rows = [
         notice_row
         for notice_row in (
-            _build_notice_row("Номер извещения", notice_number),
-            _build_notice_row("Статус извещения", notice_status),
-            _build_notice_row("Дата публикации", publish_date),
-            _build_notice_row("Дата создания", create_date),
-            _build_notice_row("Дата обновления", update_date),
-            _build_notice_row("Начало приёма заявок", bidd_start_at),
-            _build_notice_row("Окончание приёма заявок", bidd_end_at),
-            _build_notice_row("Адрес подачи заявлений", application_address),
-            _build_notice_row("Портал подачи заявки", application_portal_url),
-            _build_notice_row("Площадка торгов", auction_site_url),
+            _build_notice_row("Номер извещения", lot.notice_number),
+            _build_notice_row("Дата публикации", lot.notice_publish_date),
+            _build_notice_row("Начало приёма заявок", lot.application_start_at),
+            _build_notice_row("Окончание приёма заявок", lot.application_deadline),
+            _build_notice_row("Адрес подачи заявлений", lot.application_address),
         )
         if notice_row is not None
     ]
 
-    notice_source_url = next(
-        (
-            value
-            for value in (application_portal_url, auction_site_url, lot.source_url)
-            if _has_detail_value(value)
-        ),
-        None,
-    )
-
     return {
         "notice_rows": notice_rows,
         "notice_documents": _notice_attachments(raw_data),
-        "notice_source_url": notice_source_url,
+        "notice_source_url": lot.notice_url if _has_detail_value(lot.notice_url) else None,
     }
 
 

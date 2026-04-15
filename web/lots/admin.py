@@ -5,7 +5,7 @@ from .models import Lot, Region, UserLot
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "slug", "torgi_region_code", "is_active", "sort_order")
+    list_display = ("id", "name", "slug", "torgi_region_code", "subject_rf_code", "is_active", "sort_order")
     search_fields = ("name", "slug")
     list_filter = ("is_active",)
     readonly_fields = [field.name for field in Region._meta.fields]

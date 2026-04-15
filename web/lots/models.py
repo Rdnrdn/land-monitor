@@ -66,6 +66,7 @@ class Region(models.Model):
     name = models.CharField(max_length=255)
     slug = models.CharField(max_length=100)
     torgi_region_code = models.IntegerField()
+    subject_rf_code = models.CharField(max_length=10, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     sort_order = models.IntegerField(default=0)
 

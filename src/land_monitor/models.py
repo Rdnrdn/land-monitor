@@ -178,12 +178,14 @@ class Region(Base):
         Index("idx_regions_sort_order", "sort_order"),
         Index("uq_regions_slug", "slug", unique=True),
         Index("uq_regions_torgi_region_code", "torgi_region_code", unique=True),
+        Index("uq_regions_subject_rf_code", "subject_rf_code", unique=True),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(100), nullable=False)
     torgi_region_code: Mapped[int] = mapped_column(nullable=False)
+    subject_rf_code: Mapped[str | None] = mapped_column(String(10))
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     sort_order: Mapped[int] = mapped_column(nullable=False, server_default=text("0"))
 

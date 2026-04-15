@@ -103,11 +103,7 @@ def _notice_lots_jsonb_sql(raw_data_expression: str = "raw_data") -> str:
 
 
 def _lot_product_scope_q() -> Q:
-    return (
-        Q(source="opendata_notice", source_notice_bidd_type_code="ZK")
-        | ~Q(source="opendata_notice")
-        | Q(source__isnull=True)
-    )
+    return Q(source="opendata_notice", source_notice_bidd_type_code="ZK")
 
 
 def _scoped_lot_queryset():
@@ -959,15 +955,11 @@ class LotListView(OptionalLoginRequiredMixin, ListView):
             queryset = queryset.filter(lot_status_external=status)
 
         if self.selected_region is not None:
-            region_code = (
-                MOSCOW_OBLAST_RF_CODE
-                if self.selected_region.slug == MOSCOW_OBLAST_SLUG
-                else str(self.selected_region.torgi_region_code)
-            )
-            queryset = queryset.filter(
-                Q(region_ref=self.selected_region)
-                | Q(source="opendata_notice", subject_rf_code=region_code)
-            )
+            region_code = (self.selected_region.subject_rf_code or "").strip()
+            if region_code:
+                queryset = queryset.filter(subject_rf_code=region_code)
+            else:
+                queryset = queryset.none()
 
         if apply_subject_filter and self.selected_subject_codes:
             queryset = queryset.filter(subject_ref__code__in=self.selected_subject_codes)
@@ -1053,6 +1045,7 @@ class LotListView(OptionalLoginRequiredMixin, ListView):
         region_query = Q(slug=raw_region) | Q(name=raw_region)
         if raw_region.isdigit():
             region_query |= Q(torgi_region_code=int(raw_region))
+            region_query |= Q(subject_rf_code=raw_region)
         return Region.objects.filter(region_query).order_by("sort_order", "name").first()
 
     @cached_property

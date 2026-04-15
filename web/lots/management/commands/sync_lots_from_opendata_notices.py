@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -42,6 +42,7 @@ LOT_SNAPSHOT_KEYS = (
     "docs",
     "imageIds",
 )
+ALLOWED_FIAS_SCOPE_LEVELS = {3, 5, 6}
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -53,6 +54,16 @@ def _clean_text(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _parse_date(value: str, option_name: str) -> date:
+    cleaned = _clean_text(value)
+    if not cleaned:
+        raise CommandError(f"{option_name} must use YYYY-MM-DD format.")
+    try:
+        return date.fromisoformat(cleaned)
+    except ValueError as exc:
+        raise CommandError(f"{option_name} must use YYYY-MM-DD format.") from exc
 
 
 def _get_nested(mapping: dict[str, Any], *keys: str) -> Any:
@@ -163,6 +174,28 @@ def _fias_guid(estate_address_fias: Any) -> str | None:
     return _clean_text(_get_nested(_as_dict(estate_address_fias), "addressByFIAS", "guid"))
 
 
+def _parse_fias_scope(value: str) -> dict[str, Any]:
+    cleaned = _clean_text(value)
+    if not cleaned:
+        raise CommandError("--fias-scope must use SUBJECT_RF_CODE:LEVEL:GUID format.")
+    parts = [part.strip() for part in cleaned.split(":", 2)]
+    if len(parts) != 3 or not all(parts):
+        raise CommandError("--fias-scope must use SUBJECT_RF_CODE:LEVEL:GUID format.")
+    subject_rf_code, level_raw, guid = parts
+    try:
+        level = int(level_raw)
+    except ValueError as exc:
+        raise CommandError("--fias-scope level must be an integer.") from exc
+    if level not in ALLOWED_FIAS_SCOPE_LEVELS:
+        raise CommandError("--fias-scope level must be one of 3, 5, 6.")
+    return {
+        "subject_rf_code": subject_rf_code,
+        "level": level,
+        "guid": guid,
+        "label": f"{subject_rf_code}:level_{level}:{guid}",
+    }
+
+
 def _opendata_notice_payload(raw_data: Any) -> dict[str, Any]:
     raw = _as_dict(raw_data)
     opendata = _as_dict(raw.get("opendata"))
@@ -229,6 +262,24 @@ def _lot_snapshot(lot_payload: dict[str, Any]) -> dict[str, Any]:
     return snapshot
 
 
+def _lot_scope_match(
+    lot_snapshot: dict[str, Any],
+    fias_scopes: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, dict[str, str | None], str | None]:
+    subject_code = _dict_value(_as_dict(lot_snapshot.get("subjectRF")), "code")
+    fias_levels = extract_fias_levels(lot_snapshot.get("estateAddressFIAS"))
+    if not fias_scopes:
+        return None, fias_levels, subject_code
+
+    for scope in fias_scopes:
+        if subject_code != scope["subject_rf_code"]:
+            continue
+        level_guid = fias_levels.get(f"fias_level_{scope['level']}_guid")
+        if level_guid and level_guid == scope["guid"]:
+            return scope, fias_levels, subject_code
+    return None, fias_levels, subject_code
+
+
 def _merge_raw_data(
     existing: Any,
     *,
@@ -274,13 +325,14 @@ def _mapped_values(
     *,
     subjects_by_code: dict[str, Subject],
     source_notice_bidd_type_code: str | None,
+    fias_levels: dict[str, str | None] | None = None,
 ) -> dict[str, Any]:
     subject = _as_dict(lot_snapshot.get("subjectRF"))
     category = _as_dict(lot_snapshot.get("category"))
     ownership_form = _as_dict(lot_snapshot.get("ownershipForms"))
     characteristics = lot_snapshot.get("characteristics")
     subject_code = _dict_value(subject, "code")
-    fias_levels = extract_fias_levels(lot_snapshot.get("estateAddressFIAS"))
+    fias_levels = fias_levels or extract_fias_levels(lot_snapshot.get("estateAddressFIAS"))
     contract_terms = _extract_lot_contract_terms(lot_snapshot)
 
     return {
@@ -427,12 +479,36 @@ class Command(BaseCommand):
             default=None,
             help="Optional JSON report path. Defaults to .local/diagnostics/opendata_notice_lot_sync_<timestamp>.json.",
         )
+        parser.add_argument(
+            "--publish-date-from",
+            default=None,
+            help="Optional inclusive publish_date lower bound for candidate notices, YYYY-MM-DD.",
+        )
+        parser.add_argument(
+            "--fias-scope",
+            action="append",
+            default=[],
+            metavar="SUBJECT:LEVEL:GUID",
+            help="Optional repeatable lot-level scope in SUBJECT_RF_CODE:LEVEL:GUID format. Level must be 3, 5, or 6.",
+        )
 
     def handle(self, *args, **options):
         started_at = datetime.now(timezone.utc)
         dry_run = bool(options["dry_run"])
         limit_notices = int(options["limit_notices"])
         after_notice_number = _clean_text(options.get("after_notice_number"))
+        publish_date_from_raw = _clean_text(options.get("publish_date_from"))
+        publish_date_from = (
+            _parse_date(publish_date_from_raw, "--publish-date-from")
+            if publish_date_from_raw
+            else None
+        )
+        publish_date_from_dt = (
+            datetime.combine(publish_date_from, time.min, tzinfo=timezone.utc)
+            if publish_date_from
+            else None
+        )
+        fias_scopes = [_parse_fias_scope(value) for value in options.get("fias_scope") or []]
         if limit_notices <= 0:
             raise CommandError("--limit-notices must be a positive integer.")
 
@@ -459,8 +535,15 @@ class Command(BaseCommand):
             "examples": [],
             "problem_examples": [],
             "after_notice_number": after_notice_number,
+            "publish_date_from": publish_date_from.isoformat() if publish_date_from else None,
+            "fias_scopes": fias_scopes,
             "first_notice_number_in_batch": None,
             "last_notice_number_in_batch": None,
+            "notices_skipped_by_publish_date": 0,
+            "notices_skipped_by_fias_scope": 0,
+            "lot_objects_scanned": 0,
+            "scoped_lot_candidates": 0,
+            "scope_hit_counts": {},
         }
 
         db = SessionLocal()
@@ -469,6 +552,8 @@ class Command(BaseCommand):
             query = db.query(Notice).filter(Notice.raw_data["opendata"].isnot(None))
             if after_notice_number:
                 query = query.filter(Notice.notice_number > after_notice_number)
+            if publish_date_from_dt is not None:
+                query = query.filter(Notice.publish_date.isnot(None), Notice.publish_date >= publish_date_from_dt)
             query = query.order_by(Notice.notice_number).limit(limit_notices)
 
             for notice_row in query.yield_per(25):
@@ -502,9 +587,10 @@ class Command(BaseCommand):
                 stats["notices_processed"] += 1
                 notice_subset = _notice_subset(notice_payload, source_meta)
                 source_url = _notice_source_url(notice_payload, source_meta)
+                notice_has_scope_match = False
 
                 for lot_payload in lots_payload:
-                    stats["lots_processed"] += 1
+                    stats["lot_objects_scanned"] += 1
                     try:
                         if not isinstance(lot_payload, dict):
                             stats["skipped"] += 1
@@ -527,10 +613,25 @@ class Command(BaseCommand):
 
                         source_lot_id = f"{notice_number}_{lot_number}"
                         lot_snapshot = _lot_snapshot(lot_payload)
+                        matched_scope, fias_levels, matched_subject_code = _lot_scope_match(
+                            lot_snapshot,
+                            fias_scopes,
+                        )
+                        if fias_scopes and matched_scope is None:
+                            stats["skipped"] += 1
+                            continue
+
+                        notice_has_scope_match = True
+                        stats["lots_processed"] += 1
+                        stats["scoped_lot_candidates"] += 1
+                        if matched_scope is not None:
+                            label = matched_scope["label"]
+                            stats["scope_hit_counts"][label] = stats["scope_hit_counts"].get(label, 0) + 1
                         mapped_values = _mapped_values(
                             lot_snapshot,
                             subjects_by_code=subjects_by_code,
                             source_notice_bidd_type_code=notice_bidd_type_code,
+                            fias_levels=fias_levels,
                         )
                         lot_status = _clean_text(lot_snapshot.get("lotStatus"))
                         raw_snapshot = _merge_raw_data(
@@ -540,7 +641,7 @@ class Command(BaseCommand):
                         )
 
                         stats["coverage_total"] += 1
-                        if mapped_values.get("subject_rf_code"):
+                        if mapped_values.get("subject_rf_code") or matched_subject_code:
                             stats["coverage_subject"] += 1
                         if mapped_values.get("address"):
                             stats["coverage_address"] += 1
@@ -578,6 +679,7 @@ class Command(BaseCommand):
                                         "lotNumber": lot_number,
                                         "source_lot_id": source_lot_id,
                                         "lotStatus": lot_status,
+                                        "scope": matched_scope["label"] if matched_scope else None,
                                     }
                                 )
                             continue
@@ -611,6 +713,7 @@ class Command(BaseCommand):
                                         "source_lot_id": source_lot_id,
                                         "lotStatus": lot_status,
                                         "changed_fields": sorted(changed_fields),
+                                        "scope": matched_scope["label"] if matched_scope else None,
                                     }
                                 )
                     except Exception as exc:  # noqa: BLE001 - per-lot diagnostics must not stop the batch.
@@ -625,6 +728,9 @@ class Command(BaseCommand):
                                     "error": str(exc),
                                 }
                             )
+
+                if fias_scopes and not notice_has_scope_match:
+                    stats["notices_skipped_by_fias_scope"] += 1
 
             if dry_run:
                 db.rollback()
@@ -673,7 +779,11 @@ class Command(BaseCommand):
         for key in (
             "notices_scanned",
             "notices_processed",
+            "notices_skipped_by_publish_date",
+            "notices_skipped_by_fias_scope",
+            "lot_objects_scanned",
             "lots_processed",
+            "scoped_lot_candidates",
             "created",
             "updated",
             "skipped",
@@ -690,6 +800,7 @@ class Command(BaseCommand):
         self.stdout.write(f"coverage_address={json.dumps(stats['coverage']['address'], ensure_ascii=False)}")
         self.stdout.write(f"coverage_area={json.dumps(stats['coverage']['area'], ensure_ascii=False)}")
         self.stdout.write(f"coverage_cadastre={json.dumps(stats['coverage']['cadastre'], ensure_ascii=False)}")
+        self.stdout.write(f"scope_hit_counts={json.dumps(stats['scope_hit_counts'], ensure_ascii=False)}")
         self.stdout.write(f"field_updates={json.dumps(stats['field_updates'], ensure_ascii=False)}")
         self.stdout.write(f"examples={json.dumps(stats['examples'], ensure_ascii=False)}")
         self.stdout.write(f"problem_examples={json.dumps(stats['problem_examples'][:5], ensure_ascii=False)}")

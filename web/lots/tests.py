@@ -110,3 +110,49 @@ class OpendataNoticeIngestTests(SimpleTestCase):
         planned = backlog[:max_hrefs]
         self.assertEqual([kv["reg_num"] for _, kv in planned], ["n1", "n2"])
         self.assertEqual(len(planned), max_hrefs)
+
+
+class OpendataLotSyncScopeTests(SimpleTestCase):
+    def test_parse_fias_scope(self):
+        from lots.management.commands.sync_lots_from_opendata_notices import _parse_fias_scope
+
+        scope = _parse_fias_scope("69:3:e2d4a16b-79d1-4014-af64-4669fd89d824")
+
+        self.assertEqual(scope["subject_rf_code"], "69")
+        self.assertEqual(scope["level"], 3)
+        self.assertEqual(scope["guid"], "e2d4a16b-79d1-4014-af64-4669fd89d824")
+        self.assertEqual(scope["label"], "69:level_3:e2d4a16b-79d1-4014-af64-4669fd89d824")
+
+    def test_lot_scope_match_uses_subject_and_fias_guid(self):
+        from lots.management.commands.sync_lots_from_opendata_notices import _lot_scope_match
+
+        lot_snapshot = {
+            "subjectRF": {"code": "61"},
+            "estateAddressFIAS": {
+                "addressByFIAS": {
+                    "hierarchyObjects": [
+                        {
+                            "guid": "region-guid",
+                            "name": "обл Ростовская",
+                            "level": {"code": 1},
+                        },
+                        {
+                            "guid": "city-guid",
+                            "name": "г Ростов-на-Дону",
+                            "level": {"code": 5},
+                        },
+                    ]
+                }
+            },
+        }
+        scopes = [
+            {"subject_rf_code": "69", "level": 3, "guid": "wrong-guid", "label": "69:level_3:wrong-guid"},
+            {"subject_rf_code": "61", "level": 5, "guid": "city-guid", "label": "61:level_5:city-guid"},
+        ]
+
+        matched_scope, fias_levels, subject_code = _lot_scope_match(lot_snapshot, scopes)
+
+        self.assertEqual(subject_code, "61")
+        self.assertEqual(fias_levels["fias_level_5_guid"], "city-guid")
+        self.assertIsNotNone(matched_scope)
+        self.assertEqual(matched_scope["label"], "61:level_5:city-guid")

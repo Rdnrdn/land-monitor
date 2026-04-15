@@ -445,6 +445,10 @@
                     <label for="id_location">Местоположение</label>
                     <input id="id_location" type="text" name="location" value="{{ location_query }}" placeholder="Например, Кукино" data-debounce-submit>
                 </div>
+                <div class="field field--compact">
+                    <label for="deadline_from">Дедлайн с</label>
+                    <input id="deadline_from" type="date" name="deadline_from" value="{{ request.GET.deadline_from }}" data-auto-submit>
+                </div>
             </div>
 
             {% if show_fias_filter and mo_fias_tree %}
@@ -513,6 +517,7 @@
                     {% if request.GET.status %}<span class="badge">{{ request.GET.status }}</span>{% endif %}
                     {% if request.GET.price_min or request.GET.price_max %}<span class="badge">Цена</span>{% endif %}
                     {% if location_query %}<span class="badge">Местоположение: {{ location_query }}</span>{% endif %}
+                    {% if request.GET.deadline_from %}<span class="badge">Дедлайн с: {{ request.GET.deadline_from }}</span>{% endif %}
                 </div>
                 <div class="actions">
                     <button type="submit">Применить</button>

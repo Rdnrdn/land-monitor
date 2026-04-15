@@ -953,6 +953,10 @@ class LotListView(OptionalLoginRequiredMixin, ListView):
         if price_max:
             queryset = queryset.filter(price_min__lte=price_max)
 
+        deadline_from = self.request.GET.get("deadline_from")
+        if deadline_from:
+            queryset = queryset.filter(application_deadline__gte=deadline_from)
+
         status = self.request.GET.get("status")
         if status:
             queryset = queryset.filter(lot_status_external=status)
@@ -1446,6 +1450,7 @@ class LotListView(OptionalLoginRequiredMixin, ListView):
         active_filter_params = (
             "price_min",
             "price_max",
+            "deadline_from",
             "status",
             "region",
             "is_active",

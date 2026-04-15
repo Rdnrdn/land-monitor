@@ -31,6 +31,12 @@ LOT_SNAPSHOT_KEYS = (
     "lotStatus",
     "lotName",
     "lotDescription",
+    "deposit",
+    "priceMin",
+    "priceFin",
+    "priceStep",
+    "currency",
+    "priceMinVAT",
     "biddingObjectInfo",
     "additionalDetails",
     "docs",
@@ -289,6 +295,10 @@ def _mapped_values(
         "ownership_form_name": _dict_value(ownership_form, "name"),
         "lot_status_external": _clean_text(lot_snapshot.get("lotStatus")),
         "source_notice_bidd_type_code": source_notice_bidd_type_code,
+        "price_min": _value_to_decimal(lot_snapshot.get("priceMin")),
+        "price_fin": _value_to_decimal(lot_snapshot.get("priceFin")),
+        "deposit_amount": _value_to_decimal(lot_snapshot.get("deposit")),
+        "currency_code": _dict_value(lot_snapshot.get("currency"), "code"),
         "cadastre_number": _value_to_text(_characteristic_value(characteristics, CADASTRAL_NUMBER_CODES)),
         "area_m2": _value_to_decimal(_characteristic_value(characteristics, AREA_CODES)),
         "permitted_use": _value_to_text(_characteristic_value(characteristics, PERMITTED_USE_CODES)),
@@ -310,6 +320,7 @@ def _apply_mapped_values(lot: Lot, mapped_values: dict[str, Any]) -> set[str]:
         "ownership_form_name",
         "lot_status_external",
         "source_notice_bidd_type_code",
+        "currency_code",
         "contract_type_bucket",
         "contract_type_source_code",
         "contract_type_source_name",
@@ -326,6 +337,9 @@ def _apply_mapped_values(lot: Lot, mapped_values: dict[str, Any]) -> set[str]:
     ):
         _set_text_if_present(lot, field, mapped_values.get(field), changed_fields)
 
+    _set_decimal_if_present(lot, "price_min", mapped_values.get("price_min"), changed_fields)
+    _set_decimal_if_present(lot, "price_fin", mapped_values.get("price_fin"), changed_fields)
+    _set_decimal_if_present(lot, "deposit_amount", mapped_values.get("deposit_amount"), changed_fields)
     _set_decimal_if_present(lot, "area_m2", mapped_values.get("area_m2"), changed_fields)
 
     subject_id = mapped_values.get("subject_id")
@@ -361,6 +375,10 @@ def _new_lot(
         permitted_use=mapped_values.get("permitted_use"),
         ownership_form_code=mapped_values.get("ownership_form_code"),
         ownership_form_name=mapped_values.get("ownership_form_name"),
+        price_min=mapped_values.get("price_min"),
+        price_fin=mapped_values.get("price_fin"),
+        deposit_amount=mapped_values.get("deposit_amount"),
+        currency_code=mapped_values.get("currency_code"),
         lot_status_external=mapped_values.get("lot_status_external"),
         source_notice_bidd_type_code=mapped_values.get("source_notice_bidd_type_code"),
         contract_type_bucket=mapped_values.get("contract_type_bucket"),
